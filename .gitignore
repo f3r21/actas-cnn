@@ -24,3 +24,6 @@ manifest.csv
 fiducial_anchors_v1.json
 checkpoints/*_pipeline.pt
 # (data/crops_*_v3/ y data/manifest_*_v3.csv ya quedan cubiertos por `data/`)
+
+# PNGs regenerables en sample_data/ (el PDF si se versiona, el PNG no)
+sample_data/*.png

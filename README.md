@@ -55,14 +55,21 @@ python scripts/evaluate.py --split val \
     --checkpoint checkpoints/resnet18_ls_ra_mu_cos_best.pt
 ```
 
-### Opcion B — Colab/Kaggle (GPU gratis, sin tokens)
+### Opcion B — Notebook didactico local
 
-Abrir [el notebook en Colab](https://colab.research.google.com/github/f3r21/actas-cnn/blob/main/notebooks/train_portable.ipynb)
-→ activar T4 GPU → `Runtime` → `Run all`. **No requiere tokens** ni
-configuracion manual: el dataset esta en un HF dataset publico y los
-resultados (`.pt` + `.csv`) se bajan automaticamente al navegador al
-terminar. Tiempo total ≈ 20-25 min por ablation. Detalle en
-[`docs/08-setup-colab.md`](docs/08-setup-colab.md).
+`notebooks/pipeline_demo.ipynb` recorre el pipeline completo paso a
+paso con visualizaciones: PDF → PNG → fiduciales → recorte de 42
+campos → split de celdas → filtrado → entrenamiento → evaluacion.
+Cada celda muestra una figura del estado intermedio del pipeline.
+Ideal para entender el proyecto end-to-end y para reproducir las
+metricas oficiales sobre una acta concreta de muestra
+(`sample_data/sample_acta.pdf`).
+
+Tiempo total ≈ 35 min en MPS (M2). Abrir con:
+
+```bash
+jupyter notebook notebooks/pipeline_demo.ipynb
+```
 
 ## Pipeline (de PDF a votos por partido)
 
