@@ -77,16 +77,3 @@ VM, que se descarga al navegador al ejecutar la celda final.
 - O bajar manualmente desde el panel lateral de Colab (icono de
   archivo > seleccionar el .pt y .csv > tres puntos > Descargar).
 
-## Opcional: usar tokens (no requerido)
-
-Si en el futuro quisieras subir el checkpoint a un HF model repo
-privado en lugar de bajarlo al navegador:
-
-1. Generar token de escritura en https://huggingface.co/settings/tokens
-2. Colab: barra lateral izquierda → icono llave (Secrets) → `+`
-   → name `HF_TOKEN`, value el token, "Notebook access" ON.
-3. La celda 3 del notebook lo cargara automaticamente desde Secrets.
-4. Modificar la celda 7 para usar `storage.upload(...)` en lugar de
-   `files.download(...)`.
-
-Para el flujo del curso esto no es necesario.
