@@ -55,21 +55,23 @@ python scripts/evaluate.py --split val \
     --checkpoint checkpoints/resnet18_ls_ra_mu_cos_best.pt
 ```
 
-### Opcion B — Notebook didactico local
+### Opcion B — Notebook didactico
 
-`notebooks/pipeline_demo.ipynb` recorre el pipeline completo paso a
-paso con visualizaciones: PDF → PNG → fiduciales → recorte de 42
-campos → split de celdas → filtrado → entrenamiento → evaluacion.
-Cada celda muestra una figura del estado intermedio del pipeline.
-Ideal para entender el proyecto end-to-end y para reproducir las
-metricas oficiales sobre una acta concreta de muestra
-(`sample_data/sample_acta.pdf`).
+Recorre el pipeline completo paso a paso con visualizaciones de cada
+transformacion (PDF → PNG → fiduciales → recorte de 42 campos →
+split de celdas → filtrado → entrenamiento → evaluacion). Mismas
+celdas pedagogicas en dos variantes:
 
-Tiempo total ≈ 35 min en MPS (M2). Abrir con:
+- **Local (MPS / CPU)**: `notebooks/pipeline_demo.ipynb`. Abrir con
+  `jupyter notebook notebooks/pipeline_demo.ipynb`. Tiempo ≈ 35 min
+  en M2.
+- **Colab GPU (T4, sin tokens)**: [abrir en Colab](https://colab.research.google.com/github/f3r21/actas-cnn/blob/main/notebooks/pipeline_demo_colab.ipynb)
+  → `Runtime` → T4 GPU → `Run all`. Tiempo ≈ 10-15 min. El bundle
+  se baja automaticamente desde el HF dataset publico; al final el
+  navegador descarga el `.pt` y el `.csv` con las metricas.
 
-```bash
-jupyter notebook notebooks/pipeline_demo.ipynb
-```
+Ambos notebooks reproducen las metricas oficiales sobre una acta
+concreta de muestra (`sample_data/sample_acta.pdf`).
 
 ## Pipeline (de PDF a votos por partido)
 
