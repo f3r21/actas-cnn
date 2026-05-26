@@ -1,0 +1,11 @@
+# Copia el contenido a ~/.config/rclone/rclone.conf y ajusta los valores.
+
+[gcs]
+type = google cloud storage
+env_auth = true
+# project_number = TU_PROJECT_NUMBER   # opcional si usas ADC
+
+[ia]
+type = internetarchive
+access_key_id = TU_IA_ACCESS_KEY
+secret_access_key = TU_IA_SECRET_KEY

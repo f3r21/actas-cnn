@@ -1,0 +1,26 @@
+data/
+checkpoints/
+*.pt
+__pycache__/
+*.pyc
+.venv/
+.env
+manifest.csv
+
+# macOS
+.DS_Store
+
+# notebooks / cache de herramientas
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Bundles y archivos comprimidos (no van a git, suben a HF)
+*.tar.gz
+*.zip
+
+# Backups locales del experimento negativo de preprocesamiento (Sem 2 dia 2)
+fiducial_anchors_v1.json
+checkpoints/*_pipeline.pt
+# (data/crops_*_v3/ y data/manifest_*_v3.csv ya quedan cubiertos por `data/`)
