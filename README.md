@@ -28,19 +28,18 @@ Detalle completo del proyecto y del pipeline en
 ### Opcion A — Local
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/f3r21/actas-cnn.git
 cd actas-cnn
 pip install -r requirements.txt
 
-# Bajar el bundle de datos (~460 MB) desde HF
+# Bajar el bundle de datos (~460 MB) desde HF (dataset publico, sin token)
 python -c "
 from huggingface_hub import hf_hub_download
 import os
-ckpt = hf_hub_download(repo_id='f3r21/actas-cnn-dataset',
-                       filename='data_bundle.tar.gz',
-                       repo_type='dataset',
-                       token=os.environ['HF_TOKEN'])
-os.system(f'tar -xzf {ckpt} -C .')
+b = hf_hub_download(repo_id='f3r21/actas-cnn-dataset',
+                    filename='data_bundle.tar.gz',
+                    repo_type='dataset')
+os.system(f'tar -xzf {b} -C .')
 "
 
 # Entrenar (con la combinacion ganadora de ablations: LS + RA + mixup + cosine LR)
@@ -56,12 +55,14 @@ python scripts/evaluate.py --split val \
     --checkpoint checkpoints/resnet18_ls_ra_mu_cos_best.pt
 ```
 
-### Opcion B — Colab/Kaggle (GPU gratis)
+### Opcion B — Colab/Kaggle (GPU gratis, sin tokens)
 
-Abrir [`notebooks/train_portable.ipynb`](notebooks/train_portable.ipynb)
-en Colab y seguir los pasos. Guia paso a paso en
-[`docs/08-setup-colab.md`](docs/08-setup-colab.md). Tiempo total
-≈ 20-25 min por ablation en T4 gratuita.
+Abrir [el notebook en Colab](https://colab.research.google.com/github/f3r21/actas-cnn/blob/main/notebooks/train_portable.ipynb)
+→ activar T4 GPU → `Runtime` → `Run all`. **No requiere tokens** ni
+configuracion manual: el dataset esta en un HF dataset publico y los
+resultados (`.pt` + `.csv`) se bajan automaticamente al navegador al
+terminar. Tiempo total ≈ 20-25 min por ablation. Detalle en
+[`docs/08-setup-colab.md`](docs/08-setup-colab.md).
 
 ## Pipeline (de PDF a votos por partido)
 
