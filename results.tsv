@@ -1,0 +1,3 @@
+timestamp	run_id	arch	label_smoothing	randaugment	mixup	cosine_lr	epochs	digit_acc	field_acc	acta_acc	composite	kept	platform	wall_seconds	notes
+2026-05-24T00:00:00+00:00	baseline	resnet18	0.0	0	0.0	0	20	0.9812	0.9887	0.9033	0.9423	Y	local		baseline resnet18_best.pt (val 693 actas, 29106 campos; metricas de AUDIT_REPORT.md; lr=5e-4 bs=128 seed=42 de config.py)
+2026-05-27T21:20:22+00:00	baseline_smoke	resnet18	0.0	0	0.0	0	2	0.9792	0.9875	0.8672	0.9232	N	local	673.4	smoke test del harness; baseline sin ablations [smoke]
