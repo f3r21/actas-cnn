@@ -1,0 +1,10 @@
+{
+  "run_id": "run_001_ls01",
+  "arch": "resnet18",
+  "label_smoothing": 0.1,
+  "randaugment": false,
+  "mixup": 0.0,
+  "cosine_lr": false,
+  "epochs": 20,
+  "notes": "hipotesis: label smoothing 0.1 alivia overconfidence en clase mayoritaria (0) -> sube acta_acc"
+}

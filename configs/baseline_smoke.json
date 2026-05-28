@@ -1,0 +1,10 @@
+{
+  "run_id": "baseline_smoke",
+  "arch": "resnet18",
+  "label_smoothing": 0.0,
+  "randaugment": false,
+  "mixup": 0.0,
+  "cosine_lr": false,
+  "epochs": 20,
+  "notes": "smoke test del harness; baseline sin ablations"
+}
