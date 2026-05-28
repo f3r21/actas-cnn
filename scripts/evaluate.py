@@ -93,11 +93,15 @@ def main() -> None:
                     help="CSV con una fila por (archivoId, field); default: data/evaluate_<split>.csv")
     ap.add_argument("--checkpoint", default=None, type=Path,
                     help="path explicito al .pt; default: busca en checkpoints/")
+    ap.add_argument("--save-logits", action="store_true",
+                    help="guarda log_softmax por crop en data/eval_logits_<split>.parquet "
+                         "(necesario para el checksum solver downstream)")
     args = ap.parse_args()
 
     manifest = args.manifest or (ROOT / f"data/manifest_{args.split}.csv")
     crops_root = args.crops_root or (ROOT / f"data/crops_{args.split}")
     out_csv = args.out_csv or (ROOT / f"data/evaluate_{args.split}.csv")
+    logits_path = ROOT / f"data/eval_logits_{args.split}.parquet"
 
     # Cargar parquets
     archivos = pd.read_parquet(ROOT / "data/labels/actas_archivos.parquet")
@@ -125,16 +129,31 @@ def main() -> None:
     df = ds.df.reset_index(drop=True)
     loader = DataLoader(ds, batch_size=512, shuffle=False)
     all_preds = []
+    all_logprobs: list[np.ndarray] = [] if args.save_logits else []
     with torch.no_grad():
         for x, _ in loader:
             x = x.to(device)
-            all_preds.append(model(x).argmax(1).cpu().numpy())
+            logits = model(x)
+            all_preds.append(logits.argmax(1).cpu().numpy())
+            if args.save_logits:
+                # log_softmax mas estable numericamente que log(softmax)
+                lp = torch.nn.functional.log_softmax(logits, dim=1)
+                all_logprobs.append(lp.cpu().numpy())
     df["pred"] = np.concatenate(all_preds)
 
     # Extraer (archivoId, field, pos) de cada path
     parsed = df["path"].apply(parse_crop_path).apply(pd.Series)
     parsed.columns = ["archivoId", "field", "pos"]
     df = pd.concat([df, parsed], axis=1)
+
+    # Guardar log_softmax por crop si se pidio (consumido por checksum_solver)
+    if args.save_logits:
+        lp_arr = np.concatenate(all_logprobs, axis=0)  # (N, 10)
+        logits_df = df[["archivoId", "field", "pos", "label", "pred"]].copy()
+        for c in range(10):
+            logits_df[f"lp_{c}"] = lp_arr[:, c].astype(np.float32)
+        logits_df.to_parquet(logits_path, index=False)
+        print(f"log_softmax por crop -> {logits_path} ({len(logits_df)} filas)")
 
     # Construir tabla por (archivoId, field): valor predicho vs real
     rows = []
