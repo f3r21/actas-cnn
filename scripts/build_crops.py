@@ -28,13 +28,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from extract_crops import crop_fields, es_celda_escrita, load_templates, split_digits
 from scripts.detect_fiducials import detect_15, load_anchors, transform_template
+from lakehouse.field_mapping import valor_oficial_para
 from PIL import Image as _PIL_Image
-
-
-N_PARTIDOS = 38
-NPOSICION_BLANCO = 80
-NPOSICION_NULOS = 81
-NPOSICION_IMPUGNADOS = 82
 
 
 def int_to_digits(value: int, n_cells: int) -> list[int]:
@@ -53,44 +48,26 @@ def int_to_digits(value: int, n_cells: int) -> list[int]:
     return [int(c) for c in s]
 
 
-def field_value_for(name: str, votos_acta: pd.DataFrame, total_emitidos: int) -> int:
-    """Devuelve el entero del ground truth para un field name."""
-    if name.startswith("partido_"):
-        pos = int(name.split("_")[1])
-        row = votos_acta[votos_acta["nposicion"] == pos]
-        return int(row.iloc[0]["nvotos"]) if len(row) else 0
-    mapping = {
-        "votos_blanco": NPOSICION_BLANCO,
-        "votos_nulos": NPOSICION_NULOS,
-        "votos_impugnados": NPOSICION_IMPUGNADOS,
-    }
-    if name in mapping:
-        row = votos_acta[votos_acta["nposicion"] == mapping[name]]
-        return int(row.iloc[0]["nvotos"]) if len(row) else 0
-    if name == "total_ciudadanos":
-        return int(total_emitidos)
-    raise ValueError(f"field desconocido: {name}")
-
-
 def procesar_acta(
     png_path: Path,
     archivo_id: str,
     id_acta: int,
     template: dict,
-    votos: pd.DataFrame,
-    cabecera: pd.DataFrame,
+    votos_acta: pd.DataFrame,
+    cab_row: pd.DataFrame,
     crops_root: Path,
     filtrar_vacias: bool = True,
     anchors: dict | None = None,
 ) -> tuple[int, int]:
     """Procesa una acta. Devuelve (n_crops_guardados, n_celdas_vacias_filtradas).
 
+    `votos_acta` y `cab_row` ya vienen filtrados por idActa (pre-group en main()),
+    por eso aqui no se vuelve a escanear las tablas completas.
+
     Si filtrar_vacias=True, las celdas que no tienen digito escrito segun el
     label (es_celda_escrita) NO se guardan como crops. Esto resuelve el
     imbalance: 76% de las celdas son vacias y dominarian el training.
     """
-    votos_acta = votos[votos["idActa"] == id_acta]
-    cab_row = cabecera[cabecera["idActa"] == id_acta]
     if len(cab_row) == 0:
         return 0, 0
     total_raw = cab_row.iloc[0]["totalVotosEmitidos"]
@@ -114,7 +91,7 @@ def procesar_acta(
     for field in template["fields"]:
         name = field["name"]
         n_cells = field["n_digits"]
-        value = field_value_for(name, votos_acta, total_emitidos)
+        value = valor_oficial_para(name, votos_acta, total_emitidos)
         labels = int_to_digits(value, n_cells)
         digit_imgs = split_digits(fields_crops[name], n_cells)
         for pos, (label, dimg) in enumerate(zip(labels, digit_imgs)):
@@ -177,16 +154,32 @@ def main() -> None:
 
     print(f"actas a procesar: {len(to_proc)} -> {out_crops}")
     filtrar = not args.no_filtrar_vacias
+
+    # Pre-group una sola vez: en vez de escanear los 18.6M de votos (y la cabecera)
+    # por cada acta dentro del loop, se agrupa por idActa una sola vez y luego se hace
+    # lookup O(1). Convierte el join O(actas x votos) en O(votos) + O(actas). Se
+    # restringe a las idActas a procesar para no materializar el universo entero.
+    ids_acta = set(to_proc["idActa"].astype(int))
+    votos_vacio = votos.iloc[0:0]
+    cab_vacio = cabecera.iloc[0:0]
+    votos_por_acta = {
+        int(aid): g for aid, g in votos[votos["idActa"].isin(ids_acta)].groupby("idActa")
+    }
+    cab_por_acta = {
+        int(aid): g for aid, g in cabecera[cabecera["idActa"].isin(ids_acta)].groupby("idActa")
+    }
+
     n_actas_ok, n_crops_total, n_filtradas = 0, 0, 0
     for _, row in to_proc.iterrows():
         aid = row["archivoId"]
+        id_acta = int(row["idActa"])
         n_saved, n_filt = procesar_acta(
             png_path=pngs[aid],
             archivo_id=aid,
-            id_acta=int(row["idActa"]),
+            id_acta=id_acta,
             template=template,
-            votos=votos,
-            cabecera=cabecera,
+            votos_acta=votos_por_acta.get(id_acta, votos_vacio),
+            cab_row=cab_por_acta.get(id_acta, cab_vacio),
             crops_root=out_crops,
             filtrar_vacias=filtrar,
             anchors=anchors,

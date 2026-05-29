@@ -35,6 +35,7 @@ sys.path.insert(0, str(ROOT))
 
 from dataset import CropsDataset, default_transforms
 from env import torch_device
+from lakehouse.field_mapping import valor_oficial_para
 from model import build_model
 
 
@@ -66,20 +67,6 @@ def reconstruct_value(preds_by_pos: dict[int, int], n_cells: int) -> int:
     """
     digits = [preds_by_pos.get(p, 0) for p in range(n_cells)]
     return int("".join(str(d) for d in digits))
-
-
-def real_value_for(name: str, votos_acta: pd.DataFrame, total_emitidos: int) -> int:
-    if name.startswith("partido_"):
-        pos = int(name.split("_")[1])
-        row = votos_acta[votos_acta["nposicion"] == pos]
-        return int(row.iloc[0]["nvotos"]) if len(row) else 0
-    mapping = {"votos_blanco": 80, "votos_nulos": 81, "votos_impugnados": 82}
-    if name in mapping:
-        row = votos_acta[votos_acta["nposicion"] == mapping[name]]
-        return int(row.iloc[0]["nvotos"]) if len(row) else 0
-    if name == "total_ciudadanos":
-        return int(total_emitidos)
-    raise ValueError(f"field desconocido: {name}")
 
 
 def main() -> None:
@@ -136,22 +123,34 @@ def main() -> None:
     parsed.columns = ["archivoId", "field", "pos"]
     df = pd.concat([df, parsed], axis=1)
 
+    # Pre-group por idActa de las actas evaluadas: evita re-escanear votos (18.6M) y
+    # cabecera por cada acta. Mismo comportamiento, lookups O(1).
+    ids_eval = {int(aid_to_idacta[a]) for a in df["archivoId"].unique() if a in aid_to_idacta}
+    votos_vacio = votos.iloc[0:0]
+    cab_vacio = cabecera.iloc[0:0]
+    votos_por_acta = {
+        int(a): g for a, g in votos[votos["idActa"].isin(ids_eval)].groupby("idActa")
+    }
+    cab_por_acta = {
+        int(a): g for a, g in cabecera[cabecera["idActa"].isin(ids_eval)].groupby("idActa")
+    }
+
     # Construir tabla por (archivoId, field): valor predicho vs real
     rows = []
     for aid, df_acta in df.groupby("archivoId"):
         if aid not in aid_to_idacta:
             continue
         id_acta = int(aid_to_idacta[aid])
-        cab = cabecera[cabecera["idActa"] == id_acta]
+        cab = cab_por_acta.get(id_acta, cab_vacio)
         if len(cab) == 0 or pd.isna(cab.iloc[0]["totalVotosEmitidos"]):
             continue
         total_real = int(cab.iloc[0]["totalVotosEmitidos"])
-        votos_acta = votos[votos["idActa"] == id_acta]
+        votos_acta = votos_por_acta.get(id_acta, votos_vacio)
         for fname, n_cells in field_specs.items():
             crops_field = df_acta[df_acta["field"] == fname]
             preds_by_pos = dict(zip(crops_field["pos"], crops_field["pred"]))
             pred_value = reconstruct_value(preds_by_pos, n_cells)
-            real_value = real_value_for(fname, votos_acta, total_real)
+            real_value = valor_oficial_para(fname, votos_acta, total_real)
             rows.append({
                 "archivoId": aid, "field": fname,
                 "n_cells": n_cells, "n_pred_cells": len(preds_by_pos),
