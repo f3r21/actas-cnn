@@ -112,16 +112,29 @@ def main() -> None:
     df = ds.df.reset_index(drop=True)
     loader = DataLoader(ds, batch_size=512, shuffle=False)
     all_preds = []
+    all_logp = []
     with torch.no_grad():
         for x, _ in loader:
             x = x.to(device)
-            all_preds.append(model(x).argmax(1).cpu().numpy())
+            logp = torch.log_softmax(model(x), dim=1)  # argmax invariante; preds iguales
+            all_preds.append(logp.argmax(1).cpu().numpy())
+            all_logp.append(logp.cpu().numpy())
     df["pred"] = np.concatenate(all_preds)
+    logp_arr = np.concatenate(all_logp)  # (N, 10) log-probabilidades por clase
 
     # Extraer (archivoId, field, pos) de cada path
     parsed = df["path"].apply(parse_crop_path).apply(pd.Series)
     parsed.columns = ["archivoId", "field", "pos"]
     df = pd.concat([df, parsed], axis=1)
+
+    # Logits por digito (provenance: mismo checkpoint que evaluate_<split>.csv).
+    # Una fila por (archivoId, field, pos) con label, pred y lp_0..lp_9.
+    logits_df = df[["archivoId", "field", "pos", "label", "pred"]].copy()
+    for c in range(10):
+        logits_df[f"lp_{c}"] = logp_arr[:, c]
+    logits_out = ROOT / f"data/eval_logits_{args.split}.parquet"
+    logits_df.to_parquet(logits_out, index=False)
+    print(f"logits por digito guardados en {logits_out} ({len(logits_df)} filas)")
 
     # Pre-group por idActa de las actas evaluadas: evita re-escanear votos (18.6M) y
     # cabecera por cada acta. Mismo comportamiento, lookups O(1).
