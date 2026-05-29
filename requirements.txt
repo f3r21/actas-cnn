@@ -11,3 +11,9 @@ wandb
 boto3
 tqdm
 pyarrow
+
+# Capa lakehouse (data engineering): Delta sin Spark + SQL en proceso + .env
+deltalake
+duckdb
+python-dotenv
+adlfs
