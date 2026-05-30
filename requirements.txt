@@ -17,3 +17,8 @@ deltalake
 duckdb
 python-dotenv
 adlfs
+
+# Opcional: export de marts gold a Google Sheets (Looker Studio). Solo si se usa
+# GOOGLE_SHEETS_SA_JSON; el export CSV no las necesita.
+# gspread
+# gspread-dataframe
