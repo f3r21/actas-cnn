@@ -91,11 +91,15 @@ El backlog detallado esta en `docs/05-backlog.md`.
 
 ## Arquitectura
 
-El repo tiene dos pistas:
+El repo tiene tres pistas:
 
 1. **Migracion one-shot** (`archive/migracion/`): saca originales de GCS a
    HF + IA. No critico para el curso, side-project.
 2. **Pipeline principal** (raiz + `scripts/`): PDF → crops → entrenamiento.
+3. **Capa lakehouse** (`lakehouse/` + `scripts/build_lakehouse.py`): data
+   engineering ALREDEDOR del modelo congelado (medallion bronze/silver/gold +
+   star schema + calidad + dashboard) sobre ADLS Gen2. No toca el modelo. Ver
+   `docs/08-lakehouse.md`. Reporte de calidad en `QUALITY_REPORT.md`.
 
 Las auditorias exploratorias (fiduciales y generalizacion de template)
 viven en `docs/auditorias/`; `AUDIT_REPORT.md` en raiz es el resumen
