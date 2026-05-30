@@ -20,8 +20,11 @@ if str(_REPO) not in sys.path:
     sys.path.insert(0, str(_REPO))
 
 CAPAS_ORDEN = ["bronce", "silver", "gold", "calidad", "export"]
-# Capas que aun pueden no estar implementadas durante el desarrollo incremental.
-CAPAS_OPCIONALES = {"gold", "calidad", "export"}
+# Capas que aun pueden no estar implementadas durante el desarrollo incremental,
+# con el modulo exacto que las implementa (se compara contra exc.name, no substring,
+# para no tragarse un ImportError real dentro de un modulo que si existe).
+MODULO_DE_CAPA = {"gold": "lakehouse.gold", "calidad": "lakehouse.quality",
+                  "export": "lakehouse.export_sheets"}
 
 
 def _cargar_env() -> None:
@@ -66,7 +69,7 @@ def main() -> None:
             _correr(capa, args.destino)
             ejecutadas.append(capa)
         except ModuleNotFoundError as exc:
-            if capa in CAPAS_OPCIONALES and capa in str(exc):
+            if exc.name == MODULO_DE_CAPA.get(capa):
                 print(f"[build_lakehouse] {capa}: modulo aun no disponible, se omite")
                 continue
             raise

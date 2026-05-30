@@ -160,8 +160,9 @@ def main() -> None:
     # lookup O(1). Convierte el join O(actas x votos) en O(votos) + O(actas). Se
     # restringe a las idActas a procesar para no materializar el universo entero.
     ids_acta = set(to_proc["idActa"].astype(int))
-    votos_vacio = votos.iloc[0:0]
-    cab_vacio = cabecera.iloc[0:0]
+    # Copias propias: sentinelas read-only para actas sin votos/cabecera.
+    votos_vacio = votos.iloc[0:0].copy()
+    cab_vacio = cabecera.iloc[0:0].copy()
     votos_por_acta = {
         int(aid): g for aid, g in votos[votos["idActa"].isin(ids_acta)].groupby("idActa")
     }

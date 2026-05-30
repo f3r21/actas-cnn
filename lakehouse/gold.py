@@ -51,8 +51,8 @@ def construir(destino: str | None = None) -> dict[str, int]:
     # --- Dimensiones ---
     conteos["dim_organizacion_politica"] = _wr(con, "dim_organizacion_politica", """
         SELECT nposicion,
-               any_value(descripcion_partido)   AS nombre_organizacion,
-               any_value(nagrupacion_politica)   AS nagrupacion_politica,
+               max(descripcion_partido)   AS nombre_organizacion,
+               max(nagrupacion_politica)   AS nagrupacion_politica,
                (nposicion IN (80, 81, 82))       AS es_especial,
                CASE nposicion WHEN 80 THEN 'blanco' WHEN 81 THEN 'nulo'
                               WHEN 82 THEN 'impugnado' ELSE 'partido' END AS tipo_posicion
@@ -61,22 +61,22 @@ def construir(destino: str | None = None) -> dict[str, int]:
 
     conteos["dim_ubicacion"] = _wr(con, "dim_ubicacion", """
         SELECT u.ubigeo_distrito,
-               any_value(u.ubigeo_provincia)     AS ubigeo_provincia,
-               any_value(u.ubigeo_departamento)  AS ubigeo_departamento,
-               any_value(u.nombre_distrito)      AS nombre_distrito,
-               any_value(d.nombre)               AS nombre_departamento,
-               any_value(d.idAmbitoGeografico)   AS id_ambito_geografico
+               max(u.ubigeo_provincia)     AS ubigeo_provincia,
+               max(u.ubigeo_departamento)  AS ubigeo_departamento,
+               max(u.nombre_distrito)      AS nombre_distrito,
+               max(d.nombre)               AS nombre_departamento,
+               max(d.idAmbitoGeografico)   AS id_ambito_geografico
         FROM svo u LEFT JOIN departamentos d ON d.ubigeo = u.ubigeo_departamento
         GROUP BY u.ubigeo_distrito
     """, destino)
 
     conteos["dim_acta"] = _wr(con, "dim_acta", """
         SELECT idActa,
-               any_value(archivoId)              AS archivoId,
-               any_value(codigo_mesa)            AS codigo_mesa,
-               any_value(estado_acta)            AS estado_acta,
-               any_value(total_votos_emitidos)   AS total_votos_emitidos,
-               any_value(ubigeo_distrito)        AS ubigeo_distrito,
+               max(archivoId)              AS archivoId,
+               max(codigo_mesa)            AS codigo_mesa,
+               max(estado_acta)            AS estado_acta,
+               max(total_votos_emitidos)   AS total_votos_emitidos,
+               max(ubigeo_distrito)        AS ubigeo_distrito,
                (idActa IN (SELECT DISTINCT idActa FROM sp)) AS fue_evaluada_modelo
         FROM svo GROUP BY idActa
     """, destino)

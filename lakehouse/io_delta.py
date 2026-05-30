@@ -22,7 +22,9 @@ def _a_arrow(data) -> pa.Table:
 
     delta-rs no soporta el tipo Arrow `null` (columnas enteramente NaN, p.ej. varias
     columnas de mesas.parquet). Se castean a string (siguen siendo all-null pero con
-    tipo valido para Delta Lake).
+    tipo valido para Delta Lake). Los tipos dictionary (categoricals de bronze) si los
+    soporta delta-rs >= 1.x y se dejan pasar; otros tipos no estandar (duration,
+    large_list) necesitarian saneo adicional aqui si aparecieran.
     """
     tbl = data if isinstance(data, pa.Table) else pa.Table.from_pandas(data, preserve_index=False)
     for i in range(tbl.num_columns):

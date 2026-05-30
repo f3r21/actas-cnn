@@ -32,6 +32,13 @@ def _votos_oficial(con: duckdb.DuckDBPyConnection, destino: str | None) -> int:
     con.register("votos", io_delta.leer_arrow("bronze", "actas_votos"))
     con.register("cabecera", io_delta.leer_arrow("bronze", "actas_cabecera"))
     sql = f"""
+        WITH arch AS (
+            -- Un archivo de escrutinio por idActa: evita fan-out si la fuente
+            -- trae mas de un archivoId para la misma acta presidencial.
+            SELECT idActa, idEleccion, archivoId FROM archivos
+            WHERE tipo = {TIPO_ESCRUTINIO} AND idEleccion = {ID_ELECCION_PRESIDENCIAL}
+            QUALIFY ROW_NUMBER() OVER (PARTITION BY idActa ORDER BY archivoId) = 1
+        )
         SELECT
             v.idActa,
             v.idEleccion,
@@ -49,12 +56,11 @@ def _votos_oficial(con: duckdb.DuckDBPyConnection, destino: str | None) -> int:
             c.ubigeoDistrito                      AS ubigeo_distrito,
             c.nombreDistrito                      AS nombre_distrito,
             c.codigoMesa                          AS codigo_mesa
-        FROM archivos a
+        FROM arch a
         JOIN votos v
           ON v.idActa = a.idActa AND v.idEleccion = a.idEleccion
         LEFT JOIN cabecera c
           ON c.idActa = a.idActa
-        WHERE a.tipo = {TIPO_ESCRUTINIO} AND a.idEleccion = {ID_ELECCION_PRESIDENCIAL}
     """
     tbl = con.execute(sql).fetch_arrow_table()
     targets = io_delta.escribir_delta(tbl, "silver", "silver_votos_oficial", destino=destino)
@@ -85,7 +91,12 @@ def _predicciones(destino: str | None) -> int:
         "nvotos_oficial_eval": m["real"].astype("int64"),
         "correcto": m["correct"].astype(bool),
         "error": m["error"].astype("int64"),
-    }).drop_duplicates(["archivoId", "field"]).reset_index(drop=True)
+    })
+    n_antes = len(out)
+    out = out.drop_duplicates(["archivoId", "field"]).reset_index(drop=True)
+    n_dup = n_antes - len(out)
+    if n_dup:
+        print(f"[silver] WARN: {n_dup} duplicados (archivoId,field) eliminados de silver_predicciones")
 
     targets = io_delta.escribir_delta(out, "silver", "silver_predicciones", destino=destino)
     print(f"[silver] silver_predicciones     {len(out):>10,} filas -> {targets[0]} "
