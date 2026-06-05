@@ -11,3 +11,4 @@ wandb
 boto3
 tqdm
 pyarrow
+pulp
