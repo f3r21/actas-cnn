@@ -169,7 +169,8 @@ class CropsDataset(Dataset):
         return x, torch.tensor(int(row["label"]), dtype=torch.long)'''
 
 # --- Entrenamiento -----------------------------------------------------------
-TRAIN = r'''# === Entrenamiento (ResNet-18, ~5-8 min en T4) ===
+TRAIN = r'''# === Entrenamiento (ResNet-18, recipe base, ~5-8 min en T4) ===
+import os
 import numpy as np
 from torch.utils.data import DataLoader, random_split
 
@@ -199,16 +200,23 @@ def run_epoch(model, loader, device, criterion, optimizer=None, mixup_alpha=0.0)
     return loss_sum / total, correct / total
 
 def train_model(manifest, root, device, epochs=20, lr=5e-4, batch_size=128,
-                label_smoothing=0.1, randaugment=True, mixup=0.2, cosine_lr=True,
+                label_smoothing=0.0, randaugment=False, mixup=0.0, cosine_lr=False,
                 seed=42):
+    # Defaults = recipe BASE (sin RandAugment): rapido y consistente con el
+    # checkpoint oficial resnet18_best.pt (~90.3% acta). RandAugment corre en CPU
+    # por imagen y es el cuello de botella en Colab; activalo (randaugment=True,
+    # mixup=0.2, cosine_lr=True, label_smoothing=0.1) solo para la ablacion ls_ra_mu_cos.
     torch.manual_seed(seed)
     full = CropsDataset(manifest, root=root,
                         transform=default_transforms(32, train=True, randaugment=randaugment))
     n_val = max(1, int(0.2 * len(full)))
     tr, va = random_split(full, [len(full) - n_val, n_val])
     pin = device.type == "cuda"
-    trl = DataLoader(tr, batch_size=batch_size, shuffle=True, num_workers=2, pin_memory=pin)
-    val = DataLoader(va, batch_size=batch_size, shuffle=False, num_workers=2, pin_memory=pin)
+    nw = min(4, os.cpu_count() or 2)
+    trl = DataLoader(tr, batch_size=batch_size, shuffle=True, num_workers=nw,
+                     pin_memory=pin, persistent_workers=nw > 0)
+    val = DataLoader(va, batch_size=batch_size, shuffle=False, num_workers=nw,
+                     pin_memory=pin, persistent_workers=nw > 0)
     model = resnet18_cifar(1, 10).to(device)
     crit = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
     opt = torch.optim.Adam(model.parameters(), lr=lr)
@@ -243,7 +251,9 @@ def evaluate_split(model, manifest, crops_root, template, archivos, votos, cabec
     ds = CropsDataset(manifest, root=crops_root, transform=default_transforms(32, train=False))
     df = ds.df.reset_index(drop=True)
     preds = []
-    for x, _ in DataLoader(ds, batch_size=512, shuffle=False):
+    loader = DataLoader(ds, batch_size=512, shuffle=False,
+                        num_workers=min(4, os.cpu_count() or 2))
+    for x, _ in loader:
         preds.append(model(x.to(device)).argmax(1).cpu().numpy())
     df["pred"] = np.concatenate(preds)
     parsed = df["path"].apply(parse_crop_path).apply(pd.Series)

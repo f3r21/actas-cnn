@@ -54,6 +54,9 @@ def torch_device():
     if torch.backends.mps.is_available(): return torch.device("mps")
     return torch.device("cpu")
 DEVICE = torch_device(); print("device:", DEVICE)
+if DEVICE.type != "cuda":
+    print("AVISO: sin GPU CUDA. En Colab: Runtime -> Change runtime type -> T4 GPU. "
+          "Sin GPU el entrenamiento es MUY lento.")
 
 HF_DATASET_REPO = "{HF_DATASET_REPO}"   # PDFs + labels (+ crops_bundle si 01 ya corrio)
 HF_MODEL_REPO   = "{HF_MODEL_REPO}"     # checkpoints
