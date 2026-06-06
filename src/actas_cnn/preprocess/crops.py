@@ -2,14 +2,14 @@
 
 Recursos de bajo nivel del preprocesamiento:
   - crop_fields / split_digits   recorte por plantilla + division en celdas
+  - localize_digits              "donde estan los digitos" (zonal, oficial)
   - es_celda_escrita / tiene_tinta   filtrado de celdas vacias (convencion ONPE)
   - int_to_digits / field_value_for  labels right-justified desde el ground truth
   - build_crops_for_acta             orquestador: PNG + labels -> crops en disco
 
 Las coordenadas van en fraccion [0, 1] del ancho/alto para tolerar diferencias
-de DPI y de escaneo entre actas. El metodo concreto de "donde estan los digitos"
-se inyecta como `DigitLocalizer` (ver `base.py`); el default es el zonal por
-plantilla (`template_zonal.TemplateZonalLocalizer`).
+de DPI y de escaneo entre actas. Para cambiar el metodo de deteccion, reemplaza
+`localize_digits` o pasa otro callable a `build_crops_for_acta`.
 """
 from __future__ import annotations
 
@@ -57,9 +57,18 @@ def split_digits(field_img, n_digits):
             for i in range(n_digits)]
 
 
-def to_array(digit_img, size=32):
-    """Normaliza un recorte de digito a un arreglo cuadrado uint8."""
-    return np.asarray(digit_img.resize((size, size)), dtype=np.uint8)
+def localize_digits(image_path, template):
+    """Localiza las celdas de digitos de cada campo: {campo: [celda_0, ...]}.
+
+    Metodo OFICIAL (zonal): recorta cada campo por su caja de la plantilla y lo
+    parte en n_digits celdas equiespaciadas. Es el punto unico de "donde estan
+    los digitos": para cambiar la deteccion, reemplaza esta funcion (o pasa otra
+    con la misma firma a build_crops_for_acta). El localizador fiducial
+    alternativo (experimento negativo) vive en experiments/fiducial/.
+    """
+    fields = crop_fields(image_path, template)
+    return {f["name"]: split_digits(fields[f["name"]], f["n_digits"])
+            for f in template["fields"]}
 
 
 def es_celda_escrita(value, n_cells, cell_position):
@@ -158,8 +167,8 @@ def build_crops_for_acta(
 ) -> tuple[int, int]:
     """Procesa una acta y guarda sus crops. Devuelve (n_guardados, n_filtrados).
 
-    `localizer` decide donde estan los digitos (interfaz DigitLocalizer). Si es
-    None usa el zonal por plantilla (metodo oficial). Si filtrar_vacias=True las
+    `localizer` (callable png,template -> {campo:[celdas]}) decide donde estan
+    los digitos; None usa el zonal `localize_digits` (oficial). Si filtrar_vacias=True las
     celdas sin digito escrito segun el label (es_celda_escrita) NO se guardan:
     resuelve el imbalance (76% de las celdas son vacias y dominarian el training).
     """
@@ -175,11 +184,8 @@ def build_crops_for_acta(
         return 0, 0
     total_emitidos = int(total_raw)
 
-    if localizer is None:
-        # Import diferido para evitar ciclo crops <-> template_zonal.
-        from .template_zonal import TemplateZonalLocalizer
-        localizer = TemplateZonalLocalizer()
-    fields_cells = localizer.localize(png_path, template)
+    localizer = localizer or localize_digits
+    fields_cells = localizer(png_path, template)
 
     n_saved, n_filtered = 0, 0
     for field in template["fields"]:

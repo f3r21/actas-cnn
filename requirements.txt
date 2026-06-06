@@ -6,8 +6,5 @@ numpy
 pandas
 opencv-python-headless
 huggingface_hub
-datasets
-wandb
-boto3
 tqdm
 pyarrow

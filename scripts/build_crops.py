@@ -1,9 +1,8 @@
 """CLI: genera recortes de digitos etiquetados desde PNGs renderizados + parquets.
 
 Wrapper de actas_cnn.preprocess.build_crops_for_acta. Usa el localizador ZONAL
-por plantilla (metodo OFICIAL). El localizador fiducial (experimento negativo,
--0.72pp acta-level) vive en experiments/fiducial/ y se enchufa con la misma
-interfaz DigitLocalizer si se quiere reproducir ese experimento.
+por plantilla (`localize_digits`, metodo OFICIAL). El localizador fiducial
+(experimento negativo, -0.72pp acta-level) vive en experiments/fiducial/.
 
 Mapeo field -> ground truth:
 - partido_NN -> actas_votos.nvotos where nposicion=N
@@ -25,7 +24,6 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from actas_cnn.preprocess import build_crops_for_acta, load_templates
-from actas_cnn.preprocess.template_zonal import TemplateZonalLocalizer
 
 
 def main() -> None:
@@ -68,7 +66,6 @@ def main() -> None:
         out_crops = args.out_crops.with_name(f"{args.out_crops.name}_{args.split}")
     out_crops.mkdir(parents=True, exist_ok=True)
 
-    localizer = TemplateZonalLocalizer()
     filtrar = not args.no_filtrar_vacias
     print(f"actas a procesar: {len(to_proc)} -> {out_crops} (localizador zonal)")
     n_actas_ok, n_crops_total, n_filtradas = 0, 0, 0
@@ -82,7 +79,6 @@ def main() -> None:
             votos=votos,
             cabecera=cabecera,
             crops_root=out_crops,
-            localizer=localizer,
             filtrar_vacias=filtrar,
         )
         if n_saved > 0:

@@ -7,8 +7,8 @@ oficial vive en `src/actas_cnn/` y los notebooks en `notebooks/`.
 - **`fiducial/`** — Localizador alternativo de digitos por marcadores fiduciales
   (detecta 15 marcadores y alinea por afin antes de recortar). Fue el
   **experimento negativo** de Semana 2: tecnicamente correcto pero -0.72pp
-  acta-level vs el zonal por plantilla. Implementa la misma idea que la interfaz
-  `DigitLocalizer` de `actas_cnn.preprocess`. Scripts: `detect_fiducials.py`,
+  acta-level vs el zonal por plantilla. Es un reemplazo alternativo de
+  `localize_digits` de `actas_cnn.preprocess`. Scripts: `detect_fiducials.py`,
   `regenerate_anchors.py`, `test_alignment.py`.
 
 - **`audits/`** — Auditorias exploratorias: calidad de render, generalizacion del
