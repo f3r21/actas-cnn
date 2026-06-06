@@ -278,6 +278,9 @@ else:
 
 def _nb(cells) -> nbf.NotebookNode:
     nb = nbf.v4.new_notebook()
+    # IDs deterministas por indice: regenerar no produce churn de git.
+    for i, c in enumerate(cells):
+        c.id = f"c{i:02d}"
     nb.cells = cells
     nb.metadata = {
         "accelerator": "GPU",
