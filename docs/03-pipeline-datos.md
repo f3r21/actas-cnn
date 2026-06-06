@@ -10,16 +10,16 @@ De actas en PDF a un dataset de recortes de digitos etiquetados.
 
 ## Flujo
 
-1. `pdf_to_images.py`: renderiza cada PDF a imagen de pagina (PyMuPDF, sin
-   poppler). DPI 200, primera pagina.
-2. `extract_crops.py` + `templates.json`: alinea por plantilla, recorta los
-   campos numericos y segmenta cada campo en celdas. Coordenadas en
-   fraccion [0,1].
+1. `actas_cnn.render`: renderiza cada PDF a imagen de pagina (PyMuPDF, sin
+   poppler), tamano fijo 2339x3309, primera pagina.
+2. `actas_cnn.preprocess` (`localize_digits`) + `templates.json`: recorta los
+   campos numericos por plantilla y segmenta cada campo en celdas. Coordenadas
+   en fraccion [0,1].
 3. `scripts/build_crops.py`: aplica template, deriva labels desde parquets
    curados, filtra celdas vacias (no las que tienen "0" escrito, solo las
    que jamas iban a tener tinta), guarda `data/crops_<split>/<label>/*.png`.
-4. `build_dataset.py`: genera `manifest_<split>.csv` (columnas path, label).
-5. `dataset.py`: `CropsDataset` lee el manifiesto para entrenar.
+4. `actas_cnn.data.build_manifest`: genera `manifest_<split>.csv` (path, label).
+5. `actas_cnn.data.CropsDataset`: lee el manifiesto para entrenar.
 
 ## Universo de actas en el bucket
 
@@ -156,8 +156,8 @@ truth en 30/30 crops random del audit.
 
 ## Pendientes de mejora
 
-- `extract_crops.py` actual hace `split_digits` ingenuo (divide en N
-  partes iguales). En la mayoria de actas las celdas son uniformes y
+- `actas_cnn.preprocess` (`split_digits`) divide en N partes iguales. En la
+  mayoria de actas las celdas son uniformes y
   funciona; en escaneos muy mal alineados algunos digitos pueden
   cortarse. Mejorar con proyeccion vertical o contornos cuando el
   baseline este corriendo.

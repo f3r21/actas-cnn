@@ -19,7 +19,7 @@ ResNet de ImageNet:
 - Global Average Pool al final, luego Linear a 10 clases.
 
 Modelo a entrenar en Semana 2. Se conserva la antigua CNN custom
-(Conv+BN+LeakyReLU+Dropout) en `model.py` como linea de referencia
+(Conv+BN+LeakyReLU+Dropout) en `actas_cnn.model` como linea de referencia
 metodologica (alcanzo 97.77% val_acc en 5 epochs), pero el modelo del
 entregable y del informe es ResNet-18 CIFAR.
 
@@ -30,7 +30,7 @@ Convergio a **97.77% val_acc** en 5 epochs sobre 106k crops de
 entrenamiento, medido por `scripts/audit.py` CHECK 7 sobre el manifest
 de validacion completo. Detalle reproducible en `AUDIT_REPORT.md`.
 
-## Entrenamiento (train.py)
+## Entrenamiento (actas_cnn.training)
 
 - Detecta device: CUDA (Kaggle/Colab), MPS (M2) o CPU.
 - Split train/val 80/20 random sobre el manifest pasado (en Semana 2 se
@@ -57,7 +57,7 @@ nunca da problema.
 
 ## Metricas y evaluacion
 
-**Implementadas en `train.py`**:
+**Implementadas en `actas_cnn.training`**:
 - Exactitud por digito (digit-level accuracy).
 
 **Pendientes para `scripts/evaluate.py`** (Semana 2-3):

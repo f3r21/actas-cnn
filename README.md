@@ -1,5 +1,7 @@
 # actas-cnn
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/f3r21/actas-cnn/blob/main/notebooks/02_entregable_colab.ipynb)
+
 Reconocimiento automatico y agregacion de votos manuscritos en actas
 electorales presidenciales del Peru (Elecciones Generales 2026) con
 redes neuronales convolucionales en PyTorch. Proyecto del curso
@@ -40,9 +42,6 @@ actas (PDFs) hasta las metricas finales:
   y **publica el bundle de crops en HF**. Es la superficie que mas se itera:
   para cambiar *como se detectan los digitos* se edita aca y se re-publica; el
   entregable consume la ultima version.
-
-> El notebook didactico local de Semana 1 quedo en `notebooks/dev/` como
-> referencia de testing.
 
 ## Reproduccion local (paquete)
 
@@ -132,17 +131,14 @@ val_acc digit-level).
 ```
 src/actas_cnn/            paquete (fuente de verdad del pipeline)
   render.py               PDF -> PNG
-  preprocess/             *** deteccion de digitos (enchufable) ***
-    base.py               interfaz DigitLocalizer
-    template_zonal.py     localizador oficial (zonal por plantilla)
-    crops.py              crop_fields, split_digits, es_celda_escrita, labels, build_crops_for_acta
+  preprocess/             *** deteccion de digitos (enchufable: localize_digits) ***
+    crops.py              localize_digits, crop_fields, split_digits, es_celda_escrita, labels, build_crops_for_acta
   data.py                 CropsDataset, transforms, build_manifest
   model.py                resnet18_cifar + LeNetCNN + DeepCNN
   training.py             entrenamiento con flags de ablation
   evaluate.py             field/acta-level + reconstruccion de totales
-  metrics.py              confusion, P/R/F1 por clase, tabla de ablations
   viz.py                  overlays del template
-  config.py / env.py / storage.py   transversales
+  config.py / env.py / storage.py   transversales (storage = Hugging Face)
 
 scripts/                  wrappers CLI delgados (repro / testing)
   build_crops.py, build_dataset.py, split_dataset.py, train.py, evaluate.py
@@ -153,7 +149,6 @@ scripts/                  wrappers CLI delgados (repro / testing)
 notebooks/
   01_preprocesamiento_colab.ipynb   PDFs HF -> crops -> publica bundle en HF
   02_entregable_colab.ipynb         *** ENTREGABLE *** crops -> train -> eval -> metricas
-  dev/pipeline_demo.ipynb           demo didactico local (Semana 1, testing)
 
 experiments/              fuera del hot path (pruebas / experimentos)
   fiducial/               localizador alternativo por marcadores (exp. negativo)

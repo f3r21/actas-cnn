@@ -90,8 +90,8 @@ Lo que queda:
 2. **Extender la evaluacion**: matriz de confusion 10x10, precision/
    recall/F1 por clase, curvas train/val.
 3. **Redactar el informe** (capitulos 1-5) y armar slides (20 min).
-4. **Reproducibilidad / cierre**: rellenar `config.py` (repos HF/W&B),
-   README de setup, publicar dataset + checkpoint.
+4. **Reproducibilidad / cierre**: README de setup, dataset + checkpoint
+   publicados en HF (hecho).
 
 El backlog detallado esta en `docs/05-backlog.md`.
 
@@ -137,19 +137,19 @@ actas_cnn.evaluate          reconstruye enteros, suma por partido, compara vs pa
 scripts/split_dataset.py    archivoIds -> splits train/val/test 70/15/15
 ```
 
-`actas_cnn.preprocess` aisla *donde estan los digitos* detras de la interfaz
-`DigitLocalizer` (`base.py`); el default es `TemplateZonalLocalizer`. Es la
-superficie que mas se itera: para cambiar la deteccion, escribe otro localizador
-con la misma interfaz (o edita el bloque PREPROCESS de `tools/_inline_code.py`
-para los notebooks). El localizador fiducial vive en `experiments/fiducial/`.
+`actas_cnn.preprocess` aisla *donde estan los digitos* en la funcion
+`localize_digits` (zonal por plantilla, oficial). Es la superficie que mas se
+itera: para cambiar la deteccion, reemplaza `localize_digits` o pasa otro
+callable a `build_crops_for_acta` (o edita el bloque PREPROCESS de
+`tools/_inline_code.py` para los notebooks). El localizador fiducial vive en
+`experiments/fiducial/`.
 
 ### Modulos transversales
 
-- **`actas_cnn.config`**: `RemoteConfig` (repos HF/R2/W&B) y `TrainConfig`.
+- **`actas_cnn.config`**: `RemoteConfig` (repos HF) y `TrainConfig`.
 - **`actas_cnn.env`**: detecta entorno (kaggle/colab/local) y device; `base_dir()`.
-- **`actas_cnn.storage`**: capa de redundancia HF / R2 / W&B. Opcional.
-- **`actas_cnn.metrics`** / **`actas_cnn.viz`**: tablas (confusion, P/R/F1,
-  ablations) y overlays del template.
+- **`actas_cnn.storage`**: subida/descarga a Hugging Face. Opcional (requiere `HF_TOKEN`).
+- **`actas_cnn.viz`**: overlays del template (compartido por previews y auditorias).
 
 ### Scripts utilitarios
 
@@ -158,16 +158,12 @@ para los notebooks). El localizador fiducial vive en `experiments/fiducial/`.
 - `scripts/run_week1_clean_pipeline.sh`: regenera todo Semana 1.
 - `tools/build_notebooks.py`: genera los notebooks Colab desde el paquete.
 
-### Backends de storage
+### Storage (Hugging Face)
 
-`storage.py` detecta por variable de entorno:
-- **HF**: `HF_TOKEN`
-- **R2**: `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`
-- **W&B**: `WANDB_API_KEY`
-
-Tokens locales en `.env` (ver `.env.example`); en Kaggle/Colab via
-paneles de secretos. Nunca hardcodear. Los repos HF ya estan configurados
-en `actas_cnn.config` (`f3r21/actas-cnn-{dataset,model}`); W&B/R2 opcionales.
+`storage.py` sube/baja a HF con `HF_TOKEN` (escritura para subir; descargas de
+repos publicos sin token). Token local en `.env` (ver `.env.example`); en
+Kaggle/Colab via paneles de secretos. Nunca hardcodear. Los repos ya estan en
+`actas_cnn.config` (`f3r21/actas-cnn-{dataset,model}`).
 
 ### Modelos
 
