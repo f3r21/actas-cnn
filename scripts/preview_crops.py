@@ -11,8 +11,8 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 import sys
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from extract_crops import crop_fields, load_templates, split_digits
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from actas_cnn.preprocess.crops import crop_fields, load_templates, split_digits
 
 
 def _fuente(size: int = 14) -> ImageFont.ImageFont:

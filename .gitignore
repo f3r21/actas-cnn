@@ -7,6 +7,12 @@ __pycache__/
 .env
 manifest.csv
 
+# Paquete editable / build (pip install -e .)
+*.egg-info/
+build/
+dist/
+.eggs/
+
 # macOS
 .DS_Store
 

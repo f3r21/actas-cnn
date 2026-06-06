@@ -26,12 +26,12 @@ from PIL import Image, ImageDraw, ImageFont
 from torch.nn.functional import cross_entropy, softmax
 from torch.utils.data import DataLoader
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
+ROOT = Path(__file__).resolve().parents[2]  # repo root
+sys.path.insert(0, str(ROOT / "src"))
 
-from dataset import CropsDataset, default_transforms
-from env import torch_device
-from model import build_model
+from actas_cnn.data import CropsDataset, default_transforms
+from actas_cnn.env import torch_device
+from actas_cnn.model import build_model
 
 
 CKPT_CANDIDATES = ["resnet18_best.pt", "deep_best.pt", "lenet_best.pt"]

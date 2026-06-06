@@ -11,11 +11,11 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, random_split
 
-import storage
-from config import TRAIN
-from dataset import CropsDataset, default_transforms
-from env import checkpoints_dir, torch_device
-from model import build_model
+from . import storage
+from .config import TRAIN
+from .data import CropsDataset, default_transforms
+from .env import checkpoints_dir, torch_device
+from .model import build_model
 
 
 def _mixup_batch(x: torch.Tensor, y: torch.Tensor, alpha: float):

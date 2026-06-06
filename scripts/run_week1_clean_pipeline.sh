@@ -26,7 +26,7 @@ done
 echo ""
 echo "=== regenerar manifests ==="
 for split in train val test; do
-  python3 build_dataset.py \
+  python3 scripts/build_dataset.py \
     --crops "data/crops_${split}" \
     --out "data/manifest_${split}.csv"
 done
@@ -43,4 +43,4 @@ PY
 
 echo ""
 echo "=== smoke train DeepCNN 5 epochs (numeros honestos) ==="
-python3 train.py --manifest data/manifest_train.csv --root data/crops_train --arch deep --epochs 5
+python3 scripts/train.py --manifest data/manifest_train.csv --root data/crops_train --arch deep --epochs 5

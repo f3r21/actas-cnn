@@ -13,7 +13,7 @@ Reporta:
   - top-50 por oscuridad (probablemente sobreexpuestos / fotos malas)
   - actas con dimension fuera de 2339x3309
   - actas rotadas (landscape)
-  - cross-check con worst-20 de docs/auditorias/template-generalizacion.md (si hay overlap, el problema
+  - cross-check con worst-20 de archive/auditorias/template-generalizacion.md (si hay overlap, el problema
     de bajo accuracy puede venir de Etapa 1, no del template)
 
 Salida:
@@ -69,7 +69,7 @@ def medir_png(path: Path) -> RenderStats:
 
 
 def parse_worst_table(audit_md: Path) -> list[str]:
-    """Extrae los archivoIds de la seccion 'Los 20 peores actas' de docs/auditorias/template-generalizacion.md."""
+    """Extrae los archivoIds de la seccion 'Los 20 peores actas' de archive/auditorias/template-generalizacion.md."""
     if not audit_md.exists():
         return []
     txt = audit_md.read_text(encoding="utf-8")
@@ -107,7 +107,7 @@ def main() -> None:
     ap.add_argument("--rendered-dir", default=Path("data/pdfs_train/rendered"),
                     type=Path)
     ap.add_argument("--audit-template",
-                    default=Path("docs/auditorias/template-generalizacion.md"),
+                    default=Path("archive/auditorias/template-generalizacion.md"),
                     type=Path)
     ap.add_argument("--out-csv", default=Path("data/audit_render_quality.csv"),
                     type=Path)

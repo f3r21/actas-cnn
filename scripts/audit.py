@@ -26,9 +26,9 @@ import numpy as np
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from extract_crops import crop_fields, load_templates, split_digits
-from scripts.build_crops import int_to_digits
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from actas_cnn.preprocess.crops import (crop_fields, int_to_digits,
+                                        load_templates, split_digits)
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -265,7 +265,7 @@ def check_5_labels_match_image() -> CheckResult:
 # ------------------------- CHECK 6: templates random ---------------------
 
 def check_6_templates_random() -> CheckResult:
-    from scripts.preview_template import dibujar_overlay
+    from actas_cnn.viz import dibujar_overlay
     template = load_templates(ROOT / "templates.json")["presidencial"]
 
     pngs = list((ROOT / "data/pdfs_train/rendered").glob("*_p0.png"))
@@ -312,9 +312,9 @@ def check_6_templates_random() -> CheckResult:
 def check_7_val_acc_real() -> CheckResult:
     import torch
     from torch.utils.data import DataLoader
-    from dataset import CropsDataset, default_transforms
-    from env import torch_device
-    from model import build_model
+    from actas_cnn.data import CropsDataset, default_transforms
+    from actas_cnn.env import torch_device
+    from actas_cnn.model import build_model
 
     device = torch_device()
     # Prioriza el modelo del proyecto (ResNet-18). Cae a las lineas de

@@ -1,7 +1,7 @@
 """Regenera fiducial_anchors.json como mediana de N actas con 15/15 detectados.
 
 Los anchors actuales vienen de UNA acta snapshot (R2 de
-docs/auditorias/fiducial-auditoria.md). Esto los hace idiosincraticos. Para
+archive/auditorias/fiducial-auditoria.md). Esto los hace idiosincraticos. Para
 search-by-prior queremos posiciones representativas: la mediana sobre N
 actas tomadas al azar (con detector zonal actual confirmado 15/15) es
 robusta a outliers y captura el centro del patron real.
@@ -16,10 +16,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
+ROOT = Path(__file__).resolve().parents[2]  # repo root
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # experiments/fiducial
 
-from scripts.detect_fiducials import detect_15
+from detect_fiducials import detect_15
 
 
 ROLES = ["TL", "T1", "T2", "T3", "TR",

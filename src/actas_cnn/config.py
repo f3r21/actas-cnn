@@ -30,7 +30,7 @@ class TrainConfig:
     epochs: int = 20
     lr: float = 5e-4
     seed: int = 42
-    arch: str = "deep"     # "lenet" o "deep"
+    arch: str = "resnet18"  # modelo del proyecto; "lenet"/"deep" = baselines Sem 1
 
 
 REMOTE = RemoteConfig()

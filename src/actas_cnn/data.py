@@ -1,8 +1,9 @@
-"""Dataset PyTorch de recortes de digitos a partir de un manifiesto CSV.
+"""Dataset PyTorch de recortes de digitos + construccion del manifiesto.
 
 El manifiesto tiene columnas: path,label. Asi es indiferente si los recortes
 vienen de local, de Hugging Face o de un mirror: solo cambia la raiz.
 """
+import csv
 from pathlib import Path
 
 import pandas as pd
@@ -10,6 +11,28 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
+
+
+def build_manifest(crops_dir, out_csv) -> int:
+    """Escanea crops/<label>/*.png y escribe un manifiesto CSV (path,label).
+
+    Espera una carpeta organizada como crops/<label>/<archivo>.png donde label
+    es el digito 0-9. Las rutas se guardan relativas a `crops_dir`. Devuelve el
+    numero de filas escritas.
+    """
+    crops_dir = Path(crops_dir)
+    rows = []
+    for label_dir in sorted(crops_dir.iterdir()):
+        if not label_dir.is_dir():
+            continue
+        label = label_dir.name
+        for img in sorted(label_dir.glob("*.png")):
+            rows.append((str(img.relative_to(crops_dir)), label))
+    with open(out_csv, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["path", "label"])
+        writer.writerows(rows)
+    return len(rows)
 
 
 def default_transforms(image_size=32, train=True, randaugment=False):

@@ -13,7 +13,7 @@ Algoritmo: detection por zonas geometricas + sort.
   - Para cada zona (TOP, LEFT, RIGHT, BOT-CORNERS), encuentra blobs
     cuadrados oscuros y los ordena por posicion para asignar el rol
 
-Probamos bootstrap iterativo con anchors (docs/auditorias/fiducial-experimento.md) pero
+Probamos bootstrap iterativo con anchors (archive/auditorias/fiducial-experimento.md) pero
 no supero a la deteccion zonal simple — el formato ONPE es lo suficiente
 regular para que las zonas predefinidas funcionen muy bien.
 
@@ -46,7 +46,7 @@ DEFAULT_ANCHORS_PATH = Path(__file__).resolve().parent.parent / "fiducial_anchor
 # Mapeo rol -> zona geometrica. Usado por transform_template para validar
 # que la nube de markers cubre >=3 zonas antes de aplicar afin (evita
 # afinaciones mal condicionadas por puntos casi colineales; R-NEW de
-# docs/auditorias/fiducial-auditoria.md).
+# archive/auditorias/fiducial-auditoria.md).
 ZONES = {
     "TL": "TOP", "T1": "TOP", "T2": "TOP", "T3": "TOP", "TR": "TOP",
     "L1": "LEFT", "L2": "LEFT", "L3": "LEFT", "L4": "LEFT",

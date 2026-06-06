@@ -20,7 +20,8 @@ def base_dir() -> Path:
         return Path("/kaggle/working")
     if env == "colab":
         return Path("/content")
-    return Path(__file__).resolve().parent
+    # local: este archivo vive en src/actas_cnn/env.py -> repo root = parents[2]
+    return Path(__file__).resolve().parents[2]
 
 
 def data_dir() -> Path:

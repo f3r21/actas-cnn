@@ -31,11 +31,12 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from scripts.detect_fiducials import detect_15, draw_overlay
-from dataset import CropsDataset, default_transforms
-from model import build_model
-from env import torch_device
+sys.path[:0] = [str(Path(__file__).resolve().parents[2] / "src"),
+                str(Path(__file__).resolve().parents[1] / "fiducial")]
+from detect_fiducials import detect_15, draw_overlay
+from actas_cnn.data import CropsDataset, default_transforms
+from actas_cnn.model import build_model
+from actas_cnn.env import torch_device
 
 
 ROLES = ["TL", "T1", "T2", "T3", "TR",
@@ -50,7 +51,7 @@ def per_acta_accuracy(manifest_csv: Path, crops_root: Path,
     import pandas as pd
     device = torch_device()
     ckpt = torch.load(checkpoint, map_location=device, weights_only=False)
-    model = build_model("deep").to(device)
+    model = build_model(ckpt.get("arch", "deep")).to(device)
     model.load_state_dict(ckpt["model"])
     model.eval()
 

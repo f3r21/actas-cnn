@@ -13,7 +13,7 @@ import os
 import shutil
 from pathlib import Path
 
-from config import REMOTE
+from .config import REMOTE
 
 # Orden de preferencia para descargar.
 DOWNLOAD_ORDER = ("hf", "r2", "wandb")

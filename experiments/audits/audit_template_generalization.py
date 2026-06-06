@@ -9,7 +9,7 @@ calibradas. Estrategia:
 4. Histograma de accuracy por acta.
 5. Identifica los 20 peores actas.
 6. Genera overlay del template sobre los 20 peores.
-7. Escribe docs/auditorias/template-generalizacion.md con conclusion cuantitativa.
+7. Escribe archive/auditorias/template-generalizacion.md con conclusion cuantitativa.
 """
 from __future__ import annotations
 
@@ -24,14 +24,14 @@ import torch
 from PIL import Image
 from torch.utils.data import DataLoader
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
+ROOT = Path(__file__).resolve().parents[2]  # repo root
+sys.path.insert(0, str(ROOT / "src"))
 
-from dataset import CropsDataset, default_transforms
-from env import torch_device
-from model import build_model
-from scripts.preview_template import dibujar_overlay
-from extract_crops import load_templates
+from actas_cnn.data import CropsDataset, default_transforms
+from actas_cnn.env import torch_device
+from actas_cnn.model import build_model
+from actas_cnn.viz import dibujar_overlay
+from actas_cnn.preprocess.crops import load_templates
 
 VIS = ROOT / "data" / "visualizaciones"
 VIS.mkdir(exist_ok=True)
@@ -159,7 +159,7 @@ def main() -> None:
     print(f"  overlays -> {VIS / 'audit_template_worst_20.png'}")
 
     # Reporte
-    report_path = ROOT / "docs" / "auditorias" / "template-generalizacion.md"
+    report_path = ROOT / "archive" / "auditorias" / "template-generalizacion.md"
     lines = ["# AUDIT — Generalizacion del template Presidencial", ""]
     lines.append(f"Auditoria sobre {len(all_acc)} actas (val + test).")
     lines.append(f"Modelo: DeepCNN 5 epochs val_acc 95.5%.")

@@ -23,15 +23,16 @@ import torch
 from PIL import Image
 from torch.utils.data import DataLoader
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
+ROOT = Path(__file__).resolve().parents[2]  # repo root
+sys.path[:0] = [str(ROOT / "src"), str(Path(__file__).resolve().parent)]
 
 from detect_fiducials import detect_15
-from dataset import default_transforms
-from env import torch_device
-from model import build_model
-from extract_crops import crop_fields, load_templates, split_digits, es_celda_escrita
-from scripts.build_crops import field_value_for, int_to_digits
+from actas_cnn.data import default_transforms
+from actas_cnn.env import torch_device
+from actas_cnn.model import build_model
+from actas_cnn.preprocess.crops import (crop_fields, es_celda_escrita,
+                                        field_value_for, int_to_digits,
+                                        load_templates, split_digits)
 
 
 def transform_template(template: dict, src_markers: dict, dst_anchors: dict,
@@ -127,7 +128,7 @@ def main():
     votos = pd.read_parquet(ROOT / "data/labels/actas_votos.parquet")
     cabecera = pd.read_parquet(ROOT / "data/labels/actas_cabecera.parquet")
 
-    # Las 20 peores del audit previo (docs/auditorias/template-generalizacion.md)
+    # Las 20 peores del audit previo (archive/auditorias/template-generalizacion.md)
     worst_20 = [
         "69e22147d7b6147f63ec8db0", "69e47a45bbc459e6486a81f3",
         "69e291bdd7b6147f63ecbc8f", "69dc54cfd7b6147f63e5afd2",
