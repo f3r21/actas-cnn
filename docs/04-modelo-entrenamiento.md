@@ -1,5 +1,9 @@
 # 04 - Modelo y entrenamiento
 
+> **Nota (reorganizacion):** el codigo se movio al paquete `src/actas_cnn/`:
+> `model.py`→`actas_cnn.model` (`resnet18_cifar`), `train.py`→`actas_cnn.training`,
+> `scripts/evaluate.py`→`actas_cnn.evaluate` (con wrapper `scripts/evaluate.py`).
+
 ## Arquitectura del proyecto
 
 **`ResNet18CIFAR`** (He et al., 2015): variante de ResNet-18 adaptada
@@ -45,9 +49,10 @@ nunca da problema.
 
 ## Portabilidad (redundancia de GPU)
 
-- `notebooks/train_portable.ipynb` corre igual en Kaggle o Colab: clona
-  el repo, instala deps, carga tokens de los paneles de secretos, baja
-  el dataset desde HF (con fallback a R2/W&B) y entrena.
+- `notebooks/02_entregable_colab.ipynb` corre end-to-end en Colab: es
+  autonomo (codigo inline), baja datos del HF dataset publico (sin token) y
+  entrena/evalua. El preprocesamiento de las 5,000 actas vive en
+  `notebooks/01_preprocesamiento_colab.ipynb`.
 - Tokens via secretos de Kaggle/Colab; nunca hardcodear.
 
 ## Metricas y evaluacion

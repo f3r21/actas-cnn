@@ -3,8 +3,9 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 Lee tambien `docs/` en orden para el contexto completo (00-contexto, 01-decisiones,
-02-migracion, 03-pipeline-datos, 04-modelo-entrenamiento, 05-backlog,
-06-definicion-proyecto).
+03-pipeline-datos, 04-modelo-entrenamiento, 05-backlog, 06-definicion-proyecto,
+07-presentacion-outline). La doc del side-project de migracion se archivo en
+`archive/migracion/02-migracion.md`.
 
 ## Que es esto
 
@@ -16,7 +17,7 @@ electorales de las Elecciones Generales del Peru 2026.
   `docs/06-definicion-proyecto.md`.
 - Presentacion final: 18/06/2026.
 
-## Estado actual (2026-05-24, Semana 1 cerrada + audit reconciliado)
+## Estado actual (2026-06-03, Semana 2 cerrada: ResNet-18 + ablations entrenadas)
 
 - **Pipeline operativo end-to-end**: PDF → PNG → field crops → digit
   crops con labels desde parquets → manifest CSV → CNN entrenada.
@@ -37,6 +38,19 @@ electorales de las Elecciones Generales del Peru 2026.
 - **Linea de referencia**: la CNN custom de Semana 1 (Conv+BN+
   LeakyReLU+Dropout) alcanzo 97.77% val_acc digit-level; ResNet-18
   mejora +0.35pp solo cambiando la arquitectura.
+- **Ablations entrenadas y evaluadas** (Semana 2; falta consolidar la
+  tabla comparativa para el informe): checkpoints `resnet18_ls_ra_best.pt`
+  (label smoothing + RandAugment) y `resnet18_ls_ra_mu_cos_best.pt`
+  (+ mixup + cosine LR), cada uno con su `data/evaluate_val_ls_ra*.csv`.
+  La base sin augmentation (`resnet18_best.pt`) es la oficial reportada
+  arriba hasta cerrar la comparativa.
+- **Experimento de solver (post-procesamiento, sin codigo en el repo)**:
+  hay artefactos `data/eval_with_solver_val_K*_tol*.csv` (2026-05-27,
+  columnas `baseline` vs `solver` por campo, barriendo top-K y
+  tolerancia) que corrigen las predicciones de campo con una restriccion
+  (probablemente el total reportado). El script/notebook que los genera
+  NO esta en el repo (ningun .py/.ipynb menciona `solver`); recuperar o
+  reimplementar antes de citarlo en el informe.
 - **Experimento Sem 2 dia 2 (negativo, documentado)**: probamos
   mejorar el preprocesamiento (detector fiducial search-by-prior, std
   de roles TOP bajo 22-27x; projection profile en split_digits; filtro
@@ -44,15 +58,17 @@ electorales de las Elecciones Generales del Peru 2026.
   pipeline nuevo dio -0.72pp en acta-level vs el zonal viejo. El
   techo del ~98% digit-level no esta en el preprocesamiento sino en
   el modelo / labels / ambiguedad inherente. Pipeline zonal viejo es
-  el oficial. Backups del experimento: `data/crops_*_v3/`,
-  `data/manifest_*_v3.csv`, `checkpoints/resnet18_best_new_pipeline.pt`.
-- **Validacion auditada** (`AUDIT_REPORT.md`, 2026-05-24): 5 PASS / 2
-  WARNING / 0 FAIL / 1 MANUAL. PASS en conteo de PDFs, render 1:1,
-  splits sin leak, labels 30/30 correctos, val_acc no trivial (10/10
-  clases recall > 93%). WARNINGs en CHECK 1 (gap pre-Semana-1, path
-  externo) y CHECK 8 (snapshot scraper, ya no corre) — historicos, no
-  bloqueantes. MANUAL: inspeccion visual del template (overlay grid en
-  `data/visualizaciones/audit_overlays_20.png`).
+  el oficial. Backup del experimento conservado:
+  `checkpoints/resnet18_best_new_pipeline.pt` (los `data/crops_*_v3/` y
+  `data/manifest_*_v3.csv` se borraron en la limpieza de disco del 2026-06-01).
+- **Validacion auditada** (`AUDIT_REPORT.md`, via `scripts/audit.py`):
+  5 PASS / 0 WARNING / 0 FAIL / 1 MANUAL. PASS en conteo de PDFs
+  (CHECK 2), render 1:1 (CHECK 3), splits sin leak (CHECK 4), labels
+  30/30 correctos (CHECK 5) y val_acc no trivial (CHECK 7: 98.12%,
+  10/10 clases con recall > 0.95). MANUAL: inspeccion visual del
+  template en 20 actas (CHECK 6); el overlay vivia en
+  `data/visualizaciones/` (borrado el 2026-06-01, regenerable con
+  `scripts/audit.py`).
 - **Templates calibradas**: Presidencial 42 campos, auto-detectado via
   proyeccion horizontal con OpenCV.
 - **train.py protegido contra overwrite**: carga `best_acc` del
@@ -62,16 +78,20 @@ electorales de las Elecciones Generales del Peru 2026.
   digital, no manuscrito). Filtrados; pipeline solo trabaja con
   manuscritos puros.
 
-## Prioridad actual (Semana 2-4)
+## Prioridad actual (Semana 3-4, presentacion 18-jun)
 
-1. **Semana 2**: implementar ResNet-18 estilo CIFAR en `model.py`
-   (adaptar stem a 1 canal, 32x32) y entrenar 20 epochs. Ablations:
-   augmentation (RandAugment), mixup, label smoothing, profundidad
-   (ResNet-18 vs 34). Tracking en W&B.
-2. **Semana 2-3**: `scripts/evaluate.py` con metricas field-level,
-   acta-level, y reconstruccion del total.
-3. **Semana 3-4**: redactar informe (capitulos 1-5) y slides.
-4. **Semana 4**: pulido, reproducibilidad, presentacion 18-jun.
+El modelado esta esencialmente cerrado: ResNet-18 CIFAR implementada y
+entrenada, ablations (ls+ra, +mixup+cosine) entrenadas y evaluadas, y
+`scripts/evaluate.py` ya da field/acta-level + reconstruccion del total.
+Lo que queda:
+
+1. **Consolidar la tabla comparativa de ablations** (base vs ls_ra vs
+   ls_ra_mu_cos) desde los `data/evaluate_val_*.csv` para el Cap. 4.
+2. **Extender la evaluacion**: matriz de confusion 10x10, precision/
+   recall/F1 por clase, curvas train/val.
+3. **Redactar el informe** (capitulos 1-5) y armar slides (20 min).
+4. **Reproducibilidad / cierre**: rellenar `config.py` (repos HF/W&B),
+   README de setup, publicar dataset + checkpoint.
 
 El backlog detallado esta en `docs/05-backlog.md`.
 
@@ -91,43 +111,52 @@ El backlog detallado esta en `docs/05-backlog.md`.
 
 ## Arquitectura
 
-El repo tiene dos pistas:
+**El entregable es un notebook que corre en Colab de punta a punta**
+(`notebooks/02_entregable_colab.ipynb`): desde las actas (PDFs) hasta las
+metricas finales, autonomo (codigo inline, no clona el repo). El resto del repo
+es el "laboratorio" que lo respalda. Tres capas:
 
-1. **Migracion one-shot** (`archive/migracion/`): saca originales de GCS a
-   HF + IA. No critico para el curso, side-project.
-2. **Pipeline principal** (raiz + `scripts/`): PDF → crops → entrenamiento.
-
-Las auditorias exploratorias (fiduciales y generalizacion de template)
-viven en `docs/auditorias/`; `AUDIT_REPORT.md` en raiz es el resumen
-generado por `scripts/audit.py`.
+1. **`src/actas_cnn/`** — paquete, fuente de verdad del pipeline. Los notebooks
+   inline-an su logica (DRY via `tools/build_notebooks.py`); `scripts/` son
+   wrappers CLI delgados.
+2. **`experiments/`** — fuera del hot path (localizador fiducial = experimento
+   negativo, auditorias exploratorias, solver). Para pruebas, no para metricas
+   oficiales.
+3. **`archive/`** — side-projects archivados (migracion GCS→HF, auditorias
+   historicas). `AUDIT_REPORT.md` en raiz lo genera `scripts/audit.py`.
 
 ### Pipeline de datos (lineal)
 
 ```
-pdf_to_images.py            PDFs -> PNGs (PyMuPDF, tamano fijo 2339x3309, auto-rota landscape, --first-page-only)
+actas_cnn.render            PDFs -> PNGs (PyMuPDF, tamano fijo 2339x3309, auto-rota landscape)
+actas_cnn.preprocess        PNGs + plantilla -> crops/<label>/*.png  *** deteccion de digitos (enchufable) ***
+                            (zonal por plantilla = oficial; filtra vacias via es_celda_escrita)
+actas_cnn.data              build_manifest (path,label) + CropsDataset
+actas_cnn.training          ResNet-18 CIFAR (modelo del proyecto) sobre MPS/CUDA/CPU
+actas_cnn.evaluate          reconstruye enteros, suma por partido, compara vs parquets
 scripts/split_dataset.py    archivoIds -> splits train/val/test 70/15/15
-scripts/build_crops.py      PNGs + parquets + templates -> crops/<label>/*.png
-                            (filtra celdas vacias via es_celda_escrita, no umbral)
-build_dataset.py            crops -> manifest_<split>.csv
-dataset.py                  CropsDataset lee manifest durante entrenamiento
-train.py                    ResNet-18 CIFAR (modelo del proyecto) sobre MPS/CUDA/CPU
 ```
+
+`actas_cnn.preprocess` aisla *donde estan los digitos* detras de la interfaz
+`DigitLocalizer` (`base.py`); el default es `TemplateZonalLocalizer`. Es la
+superficie que mas se itera: para cambiar la deteccion, escribe otro localizador
+con la misma interfaz (o edita el bloque PREPROCESS de `tools/_inline_code.py`
+para los notebooks). El localizador fiducial vive en `experiments/fiducial/`.
 
 ### Modulos transversales
 
-- **`config.py`**: `RemoteConfig` (nombres de repos HF/R2/W&B) y
-  `TrainConfig` (hiperparams).
-- **`env.py`**: detecta entorno (kaggle/colab/local) y device.
-- **`storage.py`**: capa de redundancia HF / R2 / W&B. Opcional.
-- **`extract_crops.py`**: `crop_fields`, `split_digits`,
-  `es_celda_escrita`, `tiene_tinta` (sanity check image-based).
+- **`actas_cnn.config`**: `RemoteConfig` (repos HF/R2/W&B) y `TrainConfig`.
+- **`actas_cnn.env`**: detecta entorno (kaggle/colab/local) y device; `base_dir()`.
+- **`actas_cnn.storage`**: capa de redundancia HF / R2 / W&B. Opcional.
+- **`actas_cnn.metrics`** / **`actas_cnn.viz`**: tablas (confusion, P/R/F1,
+  ablations) y overlays del template.
 
 ### Scripts utilitarios
 
-- `scripts/preview_template.py`: visualizador de templates sobre PNG.
-- `scripts/preview_crops.py`: grilla de digit crops para QA.
+- `scripts/preview_template.py`, `scripts/preview_crops.py`: QA visual.
 - `scripts/audit.py`: auditoria de claims del dataset/modelo.
 - `scripts/run_week1_clean_pipeline.sh`: regenera todo Semana 1.
+- `tools/build_notebooks.py`: genera los notebooks Colab desde el paquete.
 
 ### Backends de storage
 
@@ -137,18 +166,20 @@ train.py                    ResNet-18 CIFAR (modelo del proyecto) sobre MPS/CUDA
 - **W&B**: `WANDB_API_KEY`
 
 Tokens locales en `.env` (ver `.env.example`); en Kaggle/Colab via
-paneles de secretos. Nunca hardcodear. `config.py` tiene TODOs para
-rellenar antes de Semana 4.
+paneles de secretos. Nunca hardcodear. Los repos HF ya estan configurados
+en `actas_cnn.config` (`f3r21/actas-cnn-{dataset,model}`); W&B/R2 opcionales.
 
 ### Modelos
 
-`model.py` expone via `build_model(arch, ...)`:
-- `ResNet18CIFAR`: modelo del proyecto. ResNet-18 estilo CIFAR
-  (He et al., 2015) con stem `3x3 stride 1` adaptado a entrada 1×32×32,
-  4 etapas residuales, GAP final. **Pendiente de implementar en Sem 2.**
-- `LeNetCNN` y `DeepCNN`: lineas de referencia metodologicas de
-  Semana 1, conservadas para reproducibilidad. La CNN custom alcanzo
-  97.77% val_acc; es el piso a superar con ResNet-18.
+`actas_cnn.model` expone via `build_model(arch, ...)`:
+- `resnet18_cifar()` (`arch="resnet18"`): modelo del proyecto, ya
+  implementado. Parchea `torchvision.models.resnet18`: stem `3x3
+  stride 1`, `maxpool=Identity`, `in_channels=1` para entrada 1×32×32;
+  mantiene las 4 etapas residuales y el GAP `(1,1)` final.
+- `LeNetCNN` y `DeepCNN` (`arch="lenet"` / `"deep"`): lineas de
+  referencia metodologicas de Semana 1, conservadas para
+  reproducibilidad. La CNN custom (deep) alcanzo 97.77% val_acc; es el
+  piso que ResNet-18 supera (+0.35pp).
 
 ## Como trabajar
 
@@ -161,36 +192,54 @@ rellenar antes de Semana 4.
 ## Comandos
 
 ```
-pip install -r requirements.txt
+pip install -e .          # instala el paquete actas_cnn (layout src/)
 
 # Pipeline completo (regenerar Semana 1):
 bash scripts/run_week1_clean_pipeline.sh
 
-# Solo entrenar (asumiendo manifests listos):
-python train.py --manifest data/manifest_train.csv --root data/crops_train \
-                --arch deep --epochs 20
+# Solo entrenar el modelo del proyecto (asumiendo manifests listos):
+python scripts/train.py --manifest data/manifest_train.csv --root data/crops_train \
+                        --arch resnet18 --epochs 20
 
-# Auditoria de progreso:
+# Evaluacion + auditoria:
+python scripts/evaluate.py --split val --checkpoint checkpoints/resnet18_best.pt
 python scripts/audit.py   # genera AUDIT_REPORT.md
+
+# Regenerar los notebooks Colab desde el paquete:
+python tools/build_notebooks.py
 ```
 
-Entrenamiento en GPU gratis: abrir `notebooks/train_portable.ipynb` en
-Kaggle o Colab.
+Entrenamiento en GPU gratis: abrir `notebooks/02_entregable_colab.ipynb`
+en Colab (T4, flujo end-to-end tokenless desde el dataset HF publico).
 
-## Datos en disco (al cerrar Semana 1)
+## Datos en disco (tras limpieza de disco 2026-06-01)
 
 ```
 data/
-├── labels/             5 parquets de ONPE + SCHEMAS.md + COVERAGE.md (122 MB)
-├── pdfs_train/         5,000 PDFs Presidenciales manuscritas (10.7 GB)
-│   └── rendered/       6,522 PNGs renderizados a 200 DPI (~65 GB)
+├── labels/             5 parquets de ONPE + SCHEMAS.md + COVERAGE.md (114 MB)
+├── pdfs_train/         5,000 PDFs Presidenciales manuscritas (~14 GB)
+│                       rendered/ BORRADO (regenerable con actas_cnn.render)
 ├── splits/             listas de archivoIds por split + manuscritas_full.txt
 ├── crops_train/        106,123 crops PNG por label/ (415 MB)
 ├── crops_val/          22,876 crops (89 MB)
 ├── crops_test/         22,955 crops (90 MB)
 ├── manifest_<split>.csv per-split manifests
-├── sample_pdfs/        3 actas calibracion + 5 muestras varias idEleccion
-└── visualizaciones/    audit grids, thumbnails, confusion matrix
+└── sample_pdfs/        3 actas calibracion + 5 muestras varias idEleccion
 ```
 
-Total: ~89 GB. Los PNGs renderizados se pueden regenerar en ~30 min.
+Total: **~15 GB** (antes ~89 GB). El 2026-06-01 se borraron derivados
+regenerables para liberar disco: `pdfs_train/rendered/` (73 GB de PNG),
+`visualizaciones/` (1.8 GB), los backups del experimento negativo
+`crops_*_v3/` + `manifest_*_v3.csv`, y `data_bundle.tar.gz`. El
+entrenamiento lee de `data/crops_*` (no de rendered/), asi que se entrena
+sin regenerar nada. Todo lo borrado es gitignored (`data/`, `checkpoints/`).
+
+**Respaldo remoto** (nuevo): los 5,000 PDFs fuente y `labels/` estan
+subidos al dataset HF publico `f3r21/actas-cnn-dataset` (PDFs en raiz,
+labels en `labels/`). Es la primera copia fuera del disco local;
+descargable con `huggingface_hub` si se pierde el local.
+
+> Nota de nomenclatura: el `data_bundle.tar.gz` borrado arriba era el bundle
+> viejo (crops + manifests + parquets). El bundle nuevo que consume el
+> entregable se llama `crops_bundle.tar.gz` y lo publica
+> `notebooks/01_preprocesamiento_colab.ipynb` (aun no esta en HF).

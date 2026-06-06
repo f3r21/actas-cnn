@@ -23,71 +23,64 @@ adaptada a entrada 32×32 px en escala de grises.
 Detalle completo del proyecto y del pipeline en
 [`CLAUDE.md`](CLAUDE.md) y en [`docs/`](docs/).
 
-## Quickstart
+## Entregable
 
-### Opcion A — Local
+El entregable es **un notebook que corre en Colab de punta a punta**, desde las
+actas (PDFs) hasta las metricas finales:
+
+- **[`notebooks/02_entregable_colab.ipynb`](notebooks/02_entregable_colab.ipynb)** —
+  abrir en Colab, `Runtime → Change runtime type → T4 GPU`, `Run all`. Es
+  autonomo (lleva todo el codigo inline; no clona el repo) y baja los datos del
+  HF dataset publico. Por defecto consume los crops ya preprocesados
+  (`MODO="cache"`, ~12 min); con `MODO="full"` procesa `N_ACTAS` actas desde el
+  PDF. `CARGAR_CHECKPOINT=True` reproduce los numeros oficiales exactos.
+
+- **[`notebooks/01_preprocesamiento_colab.ipynb`](notebooks/01_preprocesamiento_colab.ipynb)** —
+  preprocesa las 5,000 actas (render → deteccion de digitos → crops → manifests)
+  y **publica el bundle de crops en HF**. Es la superficie que mas se itera:
+  para cambiar *como se detectan los digitos* se edita aca y se re-publica; el
+  entregable consume la ultima version.
+
+> El notebook didactico local de Semana 1 quedo en `notebooks/dev/` como
+> referencia de testing.
+
+## Reproduccion local (paquete)
 
 ```bash
 git clone https://github.com/f3r21/actas-cnn.git
 cd actas-cnn
-pip install -r requirements.txt
+pip install -e .          # instala el paquete actas_cnn (layout src/)
 
-# Bajar el bundle de datos (~460 MB) desde HF (dataset publico, sin token)
-python -c "
-from huggingface_hub import hf_hub_download
-import os
-b = hf_hub_download(repo_id='f3r21/actas-cnn-dataset',
-                    filename='data_bundle.tar.gz',
-                    repo_type='dataset')
-os.system(f'tar -xzf {b} -C .')
-"
-
-# Entrenar (con la combinacion ganadora de ablations: LS + RA + mixup + cosine LR)
-python train.py --manifest data/manifest_train.csv \
-                --root data/crops_train \
-                --arch resnet18 --epochs 20 \
-                --label-smoothing 0.1 --randaugment \
-                --mixup 0.2 --cosine-lr \
-                --suffix ls_ra_mu_cos
-
-# Evaluar (digit / field / acta-level + reconstruccion totales)
-python scripts/evaluate.py --split val \
-    --checkpoint checkpoints/resnet18_ls_ra_mu_cos_best.pt
+# Con los crops en data/ (bundle de HF o generados por scripts/build_crops.py):
+python scripts/train.py    --manifest data/manifest_train.csv --root data/crops_train \
+                           --arch resnet18 --epochs 20 \
+                           --label-smoothing 0.1 --randaugment --mixup 0.2 --cosine-lr \
+                           --suffix ls_ra_mu_cos
+python scripts/evaluate.py --split val --checkpoint checkpoints/resnet18_ls_ra_mu_cos_best.pt
+python scripts/audit.py    # genera AUDIT_REPORT.md
 ```
 
-### Opcion B — Notebook didactico
-
-Recorre el pipeline completo paso a paso con visualizaciones de cada
-transformacion (PDF → PNG → fiduciales → recorte de 42 campos →
-split de celdas → filtrado → entrenamiento → evaluacion). Mismas
-celdas pedagogicas en dos variantes:
-
-- **Local (MPS / CPU)**: `notebooks/pipeline_demo.ipynb`. Abrir con
-  `jupyter notebook notebooks/pipeline_demo.ipynb`. Tiempo ≈ 35 min
-  en M2.
-- **Colab GPU (T4, sin tokens)**: [abrir en Colab](https://colab.research.google.com/github/f3r21/actas-cnn/blob/main/notebooks/pipeline_demo_colab.ipynb)
-  → `Runtime` → T4 GPU → `Run all`. Tiempo ≈ 10-15 min. El bundle
-  se baja automaticamente desde el HF dataset publico; al final el
-  navegador descarga el `.pt` y el `.csv` con las metricas.
-
-Ambos notebooks reproducen las metricas oficiales sobre una acta
-concreta de muestra (`sample_data/sample_acta.pdf`).
+Los scripts son wrappers CLI delgados del paquete `actas_cnn`. Los notebooks se
+generan desde el paquete con `python tools/build_notebooks.py`.
 
 ## Pipeline (de PDF a votos por partido)
 
 ```
 PDF (ONPE)
-   └→ pdf_to_images.py        renderiza a PNG 200 dpi (auto-rota landscape)
-       └→ scripts/build_crops.py    recorta 42 campos por plantilla calibrada;
-                                    parte cada campo en 3-4 celdas; filtra vacias
-                                    via convencion right-justified (es_celda_escrita)
-           └→ build_dataset.py     genera manifest CSV (path, label)
-               └→ dataset.py       CropsDataset PyTorch
-                   └→ train.py     ResNet-18 CIFAR sobre MPS / CUDA / CPU
-                       └→ scripts/evaluate.py    reconstruye enteros y los suma
-                                                 por organizacion politica;
-                                                 compara contra parquets oficiales
+   └→ actas_cnn.render           renderiza a PNG 2339x3309 (auto-rota landscape)
+       └→ actas_cnn.preprocess   recorta 42 campos por plantilla calibrada;
+                                  parte cada campo en 3-4 celdas; filtra vacias
+                                  via convencion right-justified (es_celda_escrita)
+                                  *** superficie de iteracion: deteccion de digitos ***
+           └→ actas_cnn.data     build_manifest (path,label) + CropsDataset
+               └→ actas_cnn.training   ResNet-18 CIFAR sobre MPS / CUDA / CPU
+                   └→ actas_cnn.evaluate   reconstruye enteros y los suma por
+                                           organizacion politica; compara contra
+                                           los parquets oficiales
 ```
+
+Wrappers CLI: `scripts/build_crops.py`, `scripts/build_dataset.py`,
+`scripts/train.py`, `scripts/evaluate.py`.
 
 42 campos: 38 organizaciones politicas + votos en blanco + votos
 nulos + votos impugnados + total de ciudadanos votantes.
@@ -110,10 +103,11 @@ nulos + votos impugnados + total de ciudadanos votantes.
 - **Validacion del manifest**: 469/469 actas (con `totalVotosEmitidos`
   no-nulo) tienen `sum(votos) == total`. Internamente consistente.
 
-El bundle empaquetado (crops + manifests + parquets + templates +
-anchors, ~460 MB) vive en
-[`f3r21/actas-cnn-dataset`](https://huggingface.co/datasets/f3r21/actas-cnn-dataset)
-en Hugging Face.
+En Hugging Face, [`f3r21/actas-cnn-dataset`](https://huggingface.co/datasets/f3r21/actas-cnn-dataset)
+aloja los **5,000 PDFs fuente** (raiz) y los **labels** (`labels/`, parquets
+ONPE). El bundle de crops ya preprocesados (`crops_bundle.tar.gz`) lo genera y
+publica `notebooks/01_preprocesamiento_colab.ipynb`; el entregable lo consume en
+`MODO="cache"`.
 
 ## Modelo
 
@@ -136,39 +130,40 @@ val_acc digit-level).
 ## Estructura del repo
 
 ```
-config.py             repos remotos + hiperparametros
-env.py                deteccion de device (CUDA/MPS/CPU)
-storage.py            capa redundante HF / R2 / W&B (opcional)
-pdf_to_images.py      PDF -> PNG batch
-extract_crops.py      crop_fields, split_digits, es_celda_escrita
-dataset.py            CropsDataset PyTorch
-model.py              ResNet18CIFAR + LeNetCNN + DeepCNN
-train.py              entrenamiento con flags de ablation
-build_dataset.py      crops -> manifest CSV
+src/actas_cnn/            paquete (fuente de verdad del pipeline)
+  render.py               PDF -> PNG
+  preprocess/             *** deteccion de digitos (enchufable) ***
+    base.py               interfaz DigitLocalizer
+    template_zonal.py     localizador oficial (zonal por plantilla)
+    crops.py              crop_fields, split_digits, es_celda_escrita, labels, build_crops_for_acta
+  data.py                 CropsDataset, transforms, build_manifest
+  model.py                resnet18_cifar + LeNetCNN + DeepCNN
+  training.py             entrenamiento con flags de ablation
+  evaluate.py             field/acta-level + reconstruccion de totales
+  metrics.py              confusion, P/R/F1 por clase, tabla de ablations
+  viz.py                  overlays del template
+  config.py / env.py / storage.py   transversales
 
-scripts/
-  build_crops.py            genera crops etiquetados desde parquets
-  split_dataset.py          70/15/15 split por archivoId
-  audit.py                  6 chequeos de integridad sobre dataset + modelo
-  evaluate.py               field/acta-level + reconstruccion totales
-  detect_fiducials.py       detector zonal de 15 markers ONPE
-  audit_errors.py           top-N crops mal clasificados
-  preview_template.py       overlay del template sobre PNGs
-  preview_crops.py          grilla de digit crops para QA
-  audit_*.py                auditorias especificas (fiducial, template, render)
-  run_week1_clean_pipeline.sh   regenera Semana 1 end-to-end
+scripts/                  wrappers CLI delgados (repro / testing)
+  build_crops.py, build_dataset.py, split_dataset.py, train.py, evaluate.py
+  audit.py                6 chequeos de integridad (genera AUDIT_REPORT.md)
+  preview_template.py, preview_crops.py, inspect_labels.py   QA visual
+  run_week1_clean_pipeline.sh
 
 notebooks/
-  train_portable.ipynb      Colab / Kaggle entry point
+  01_preprocesamiento_colab.ipynb   PDFs HF -> crops -> publica bundle en HF
+  02_entregable_colab.ipynb         *** ENTREGABLE *** crops -> train -> eval -> metricas
+  dev/pipeline_demo.ipynb           demo didactico local (Semana 1, testing)
 
-docs/
-  00-contexto.md            00..08 narrativa numerada
-  ...
-  08-setup-colab.md
-  auditorias/               docs internas de auditorias
+experiments/              fuera del hot path (pruebas / experimentos)
+  fiducial/               localizador alternativo por marcadores (exp. negativo)
+  audits/                 auditorias exploratorias
+  solver/                 post-procesamiento con restriccion (codigo a recuperar)
 
-archive/
-  migracion/                side-project GCS -> HF/IA (no critico)
+tools/build_notebooks.py  genera los notebooks desde el paquete
+
+docs/                     00-contexto .. 07-presentacion-outline (narrativa)
+archive/                  side-projects archivados (migracion + auditorias historicas)
 ```
 
 ## Validacion del modelo

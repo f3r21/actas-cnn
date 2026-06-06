@@ -2,6 +2,12 @@
 
 De actas en PDF a un dataset de recortes de digitos etiquetados.
 
+> **Nota (reorganizacion):** el codigo se movio al paquete `src/actas_cnn/`. Mapeo
+> de los nombres usados abajo: `pdf_to_images.py`→`actas_cnn.render`,
+> `extract_crops.py`→`actas_cnn.preprocess.crops`, `dataset.py` y
+> `build_dataset.py`→`actas_cnn.data`. La deteccion de digitos quedo enchufable
+> en `actas_cnn.preprocess`. Los wrappers CLI siguen en `scripts/`.
+
 ## Flujo
 
 1. `pdf_to_images.py`: renderiza cada PDF a imagen de pagina (PyMuPDF, sin
