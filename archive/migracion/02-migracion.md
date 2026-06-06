@@ -16,7 +16,11 @@ reducir, con redundancia. Detalle operativo y scripts en `archive/migracion/`
 
 1. Dimensionar: `gcloud storage du -s` y conteo de archivos. Define el sharding.
 2. Configurar remotos rclone (`gcs`, `ia`) y tokens (HF, IA S3 keys).
-3. Internet Archive: `migrar_a_ia.sh` (streaming). Dividir en varios items por
+3. Google Drive (destino prioritario, respaldo personal de 5TB): `migrar_a_drive.sh`
+   (streaming, reanudable). Respeta el cap de 750 GB/dia con
+   `--drive-stop-on-upload-limit`; si el bucket supera ~500k archivos, empaquetar
+   en tarballs por lote antes de subir. No sustituye a HF/IA como copia publica/citable.
+3b. Internet Archive: `migrar_a_ia.sh` (streaming). Dividir en varios items por
    region/tipo de eleccion (IA prefiere items moderados).
 4. Hugging Face: montar con gcsfuse y `migrar_a_hf.py` (reanudable). Si 2TB excede
    limites del repo, fragmentar por region en varios repos.

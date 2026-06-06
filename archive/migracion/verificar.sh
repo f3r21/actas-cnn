@@ -15,5 +15,11 @@ if rclone listremotes | grep -q '^ia:'; then
   rclone size "ia:${IA_ITEM_ID:-}" 2>/dev/null || echo "define IA_ITEM_ID para medir"
 fi
 
+if rclone listremotes | grep -q '^gdrive:'; then
+  echo "== Google Drive (via rclone) =="
+  echo -n "tamano/archivos en gdrive:${DRIVE_DIR:-$BUCKET}: "
+  rclone size "gdrive:${DRIVE_DIR:-$BUCKET}" 2>/dev/null || echo "aun sin datos o carpeta inexistente"
+fi
+
 echo "== Hugging Face =="
 echo "Revisa el conteo de archivos en la pagina del dataset en huggingface.co"

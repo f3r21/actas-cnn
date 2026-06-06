@@ -9,3 +9,14 @@ env_auth = true
 type = internetarchive
 access_key_id = TU_IA_ACCESS_KEY
 secret_access_key = TU_IA_SECRET_KEY
+
+# Google Drive: NO se configura a mano (usa OAuth, no llaves estaticas).
+# En una VM headless, genera el token desde una maquina con navegador:
+#   rclone authorize "drive"        # copia el JSON que imprime
+# y luego, en la VM:
+#   rclone config create gdrive drive config_is_local=false token='<JSON_PEGADO>'
+# Eso deja un bloque [gdrive] equivalente a este (token abreviado):
+[gdrive]
+type = drive
+scope = drive
+token = {"access_token":"...","refresh_token":"...","expiry":"..."}

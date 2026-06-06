@@ -48,6 +48,33 @@ Nota: Internet Archive recomienda items de tamano moderado (cientos de GB y
 decenas de miles de archivos como mucho). Divide por region o tipo de eleccion en
 varios items en vez de uno gigante.
 
+## 3b. Google Drive (destino prioritario, respaldo personal)
+
+Si tienes un plan de Drive con espacio de sobra (p. ej. 5TB), sirve como copia
+de respaldo. No reemplaza a HF/IA para la copia *publica/citable* (los enlaces de
+Drive se rate-limitean con acceso programatico y no dan URLs estables de dataset),
+pero es seguro barato.
+
+```bash
+export BUCKET=tu-bucket
+export DRIVE_DIR=actas-peru-2026     # opcional; por defecto usa el nombre del bucket
+./migrar_a_drive.sh
+```
+
+Caps de Drive a tener en cuenta:
+
+- **750 GB/dia de subida por cuenta** (cuota dura). 2TB tarda ~3 dias minimo. El
+  script usa `--drive-stop-on-upload-limit`: se detiene limpio al tocar el tope;
+  relanzalo al dia siguiente y continua donde quedo.
+- **~500,000 items en "Mi unidad"**. Si el bucket tiene mas archivos que eso,
+  empaqueta primero en tarballs por region/lote y sube esos (reduce el conteo de
+  objetos y ademas va mucho mas rapido). Mide el conteo con
+  `gcloud storage ls -r "gs://$BUCKET/**" | wc -l` (paso 2) antes de decidir.
+
+El remoto `gdrive` usa OAuth, no llaves estaticas: en una VM headless genera el
+token con `rclone authorize "drive"` desde una maquina con navegador y pegalo
+(ver `rclone.conf.example`).
+
 ## 4. Hugging Face (carpeta grande via gcsfuse)
 
 ```bash
