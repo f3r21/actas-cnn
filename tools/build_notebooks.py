@@ -125,7 +125,27 @@ for split, sids in splits.items():
         saved += ns
     n_rows = build_manifest(croot, DATA / f"manifest_{split}.csv")
     print(f"{split}: {saved} crops, manifest {n_rows} filas")'''),
-        md("## 4. Empaquetar y publicar el bundle de crops en HF\n\n"
+        md("## 4. Demostracion: desde una acta hasta los digitos\n\n"
+           "Visualiza el resultado de la deteccion sobre una acta: los 42 campos "
+           "localizados y, dentro de uno, las celdas de cada digito."),
+        code('''import matplotlib.pyplot as plt
+from PIL import Image, ImageDraw
+
+demo_aid = ids[0]
+demo_png = render_acta(pdf_dir / f"{demo_aid}.pdf", rendered)
+img = Image.open(demo_png).convert("RGB"); draw = ImageDraw.Draw(img); w, h = img.size
+for f in TEMPLATE["fields"]:
+    x0, y0, x1, y1 = f["box"]
+    draw.rectangle([x0 * w, y0 * h, x1 * w, y1 * h], outline=(255, 0, 0), width=3)
+plt.figure(figsize=(7, 10)); plt.imshow(img); plt.axis("off")
+plt.title(f"42 campos detectados — acta {demo_aid[:10]}"); plt.show()
+
+celdas = localize_digits(demo_png, TEMPLATE)
+fig, axs = plt.subplots(1, 3, figsize=(6, 2))
+for ax, c in zip(axs, celdas["partido_01"]):
+    ax.imshow(c, cmap="gray"); ax.axis("off")
+fig.suptitle("partido_01 -> 3 celdas (right-justified)"); plt.show()'''),
+        md("## 5. Empaquetar y publicar el bundle de crops en HF\n\n"
            "El entregable (`02_*`) baja este `crops_bundle.tar.gz` en `MODO=\"cache\"`."),
         code('''bundle = WORK / "crops_bundle.tar.gz"
 with tarfile.open(bundle, "w:gz") as t:
@@ -151,42 +171,38 @@ else:
 # === Notebook 02: entregable ================================================
 
 def build_entregable() -> nbf.NotebookNode:
-    modo = '''# --- Modo de datos ---
-# "cache": baja crops ya preprocesados de HF (~12 min). Requiere haber corrido
-#          01_preprocesamiento_colab.ipynb una vez (publica crops_bundle.tar.gz).
-# "full" : procesa N_ACTAS actas desde PDF, inline (sin prerequisitos, mas lento).
-MODO = "cache"
-N_ACTAS = 500              # solo MODO="full"
-CARGAR_CHECKPOINT = False  # True = baja el checkpoint oficial de HF (numeros exactos)
+    config = '''# CARGAR_CHECKPOINT=True baja el checkpoint oficial de HF (numeros exactos);
+# False entrena fresco (~5-8 min en T4).
+CARGAR_CHECKPOINT = False
 EPOCHS = 20'''
     cells = [
-        md("# actas-cnn — Entregable end-to-end (Colab)\n\n"
+        md("# actas-cnn — Modelo + evaluacion (Colab)\n\n"
            "CNN que reconoce las cifras manuscritas de conteo de votos en actas "
-           "electorales (ONPE, Elecciones Generales del Peru 2026). Va **desde las actas "
-           "(PDFs) hasta las metricas finales**.\n\n"
+           "electorales (ONPE, Elecciones Generales del Peru 2026). Parte de los **crops "
+           "preprocesados** (publicados por `01_preprocesamiento_colab.ipynb`) y va hasta "
+           "las **metricas finales**.\n\n"
+           "**Prerequisito:** corre antes `01_preprocesamiento_colab.ipynb` una vez "
+           "(publica `crops_bundle.tar.gz` en HF). Aqui el bundle se baja en segundos.\n\n"
            "**Como correr:** Runtime -> Change runtime type -> **T4 GPU**, luego "
            "Runtime -> Run all.\n\n"
            "| metrica (val, 693 actas) | esperado |\n|---|---|\n"
            "| digit-level | ~98.1% |\n| field-level | ~98.9% |\n"
            "| acta-level (42 campos) | ~90.3% |\n| reconstruccion del total (MAE) | ~2.4 votos |\n\n"
-           "Modos de datos (celda de config): `cache` (baja crops preprocesados de HF, "
-           "rapido) o `full` (procesa `N_ACTAS` desde PDF, inline). Un train fresco varia "
-           "+-0.5pp por el seed; `CARGAR_CHECKPOINT=True` reproduce los numeros exactos."),
+           "Un train fresco varia +-0.5pp por el seed; `CARGAR_CHECKPOINT=True` reproduce "
+           "los numeros exactos del checkpoint oficial."),
         md("## 0. Setup"),
         code(C.INSTALL),
-        code(config_cell(modo)),
+        code(config_cell(config)),
         code(CELL_TEMPLATE),
-        md("## 1. Codigo del pipeline (inline)\n\n"
-           "Todo el pipeline vive en estas celdas; el notebook es autonomo. La deteccion "
-           "de digitos esta marcada como superficie de iteracion."),
-        code(C.PREPROCESS),
-        code(C.LABELS_BUILD),
+        md("## 1. Codigo del modelo (inline)\n\n"
+           "Modelo, dataset, entrenamiento y evaluacion. El preprocesamiento (deteccion "
+           "de digitos) vive en `01_preprocesamiento_colab.ipynb`."),
         code(C.MODEL),
         code(C.DATASET),
         code(C.TRAIN),
         code(C.EVAL),
         code(C.METRICS),
-        md("## 2. Datos: cache (crops de HF) o full (desde PDF)"),
+        md("## 2. Datos: crops preprocesados (cache de HF)"),
         code('''from huggingface_hub import hf_hub_download, snapshot_download
 
 snapshot_download(HF_DATASET_REPO, repo_type="dataset", allow_patterns="labels/*",
@@ -195,53 +211,15 @@ archivos = pd.read_parquet(DATA / "labels/actas_archivos.parquet")
 votos    = pd.read_parquet(DATA / "labels/actas_votos.parquet")
 cabecera = pd.read_parquet(DATA / "labels/actas_cabecera.parquet")
 
-if MODO == "cache":
-    try:
-        bundle = hf_hub_download(HF_DATASET_REPO, "crops_bundle.tar.gz", repo_type="dataset")
-    except Exception as e:
-        raise RuntimeError("No hay crops_bundle.tar.gz en HF. Corre 01_preprocesamiento "
-                           "primero, o usa MODO='full'.") from e
-    with tarfile.open(bundle) as t: t.extractall(WORK)
-    print("crops_bundle extraido")
-elif MODO == "full":
-    pres = archivos[(archivos["tipo"] == 1) & (archivos["idEleccion"] == 10)]
-    ids = pres["archivoId"].tolist(); random.Random(42).shuffle(ids); ids = ids[:N_ACTAS]
-    n = len(ids); ntr = int(n * 0.70); nva = int(n * 0.15)
-    splits = {"train": ids[:ntr], "val": ids[ntr:ntr + nva], "test": ids[ntr + nva:]}
-    aid_to_idacta = dict(zip(archivos["archivoId"], archivos["idActa"]))
-    pdf_dir = WORK / "pdfs"; pdf_dir.mkdir(exist_ok=True)
-    for split, sids in splits.items():
-        croot = DATA / f"crops_{split}"
-        for aid in sids:
-            hf_hub_download(HF_DATASET_REPO, f"{aid}.pdf", repo_type="dataset", local_dir=str(pdf_dir))
-            png = render_acta(pdf_dir / f"{aid}.pdf", WORK / "rendered")
-            build_crops_for_acta(png, aid, int(aid_to_idacta[aid]), TEMPLATE, votos, cabecera, croot)
-        build_manifest(croot, DATA / f"manifest_{split}.csv")
-        print(f"{split} listo")
-else:
-    raise ValueError(MODO)'''),
-        md("## 3. Demostracion: desde una acta hasta los digitos"),
-        code('''import matplotlib.pyplot as plt
-from PIL import ImageDraw
-
-pres_ids = archivos[(archivos["tipo"] == 1) & (archivos["idEleccion"] == 10)]["archivoId"].tolist()
-demo_aid = pres_ids[0]
-hf_hub_download(HF_DATASET_REPO, f"{demo_aid}.pdf", repo_type="dataset", local_dir=str(WORK / "demo"))
-demo_png = render_acta(WORK / "demo" / f"{demo_aid}.pdf", WORK / "demo")
-
-img = Image.open(demo_png).convert("RGB"); draw = ImageDraw.Draw(img); w, h = img.size
-for f in TEMPLATE["fields"]:
-    x0, y0, x1, y1 = f["box"]
-    draw.rectangle([x0 * w, y0 * h, x1 * w, y1 * h], outline=(255, 0, 0), width=3)
-plt.figure(figsize=(7, 10)); plt.imshow(img); plt.axis("off")
-plt.title(f"42 campos detectados — acta {demo_aid[:10]}"); plt.show()
-
-cells = localize_digits(demo_png, TEMPLATE)
-fig, axs = plt.subplots(1, 3, figsize=(6, 2))
-for ax, c in zip(axs, cells["partido_01"]):
-    ax.imshow(c, cmap="gray"); ax.axis("off")
-fig.suptitle("partido_01 -> 3 celdas (right-justified)"); plt.show()'''),
-        md("## 4. Entrenamiento (o cargar el checkpoint oficial)"),
+# Crops preprocesados publicados por 01_preprocesamiento_colab.ipynb.
+try:
+    bundle = hf_hub_download(HF_DATASET_REPO, "crops_bundle.tar.gz", repo_type="dataset")
+except Exception as e:
+    raise RuntimeError("No hay crops_bundle.tar.gz en HF. Corre "
+                       "01_preprocesamiento_colab.ipynb primero.") from e
+with tarfile.open(bundle) as t: t.extractall(WORK)
+print("crops_bundle extraido")'''),
+        md("## 3. Entrenamiento (o cargar el checkpoint oficial)"),
         code('''if CARGAR_CHECKPOINT:
     try:
         ckpt = hf_hub_download(HF_MODEL_REPO, "resnet18_best.pt", repo_type="model")
@@ -253,11 +231,11 @@ fig.suptitle("partido_01 -> 3 celdas (right-justified)"); plt.show()'''),
     print("checkpoint oficial cargado (val_acc", round(float(state.get("acc", 0)), 4), ")")
 else:
     model = train_model(DATA / "manifest_train.csv", DATA / "crops_train", DEVICE, epochs=EPOCHS)'''),
-        md("## 5. Evaluacion + metricas finales"),
+        md("## 4. Evaluacion + metricas finales"),
         code('''df, res = evaluate_split(model, DATA / "manifest_val.csv", DATA / "crops_val",
                          TEMPLATE, archivos, votos, cabecera, DEVICE)
 metrics = report_metrics(df, res)'''),
-        md("## 6. Visualizaciones + tabla de ablations"),
+        md("## 5. Visualizaciones + tabla de ablations"),
         code('''cm, prf = confusion_and_prf(df)
 plot_confusion(cm, metrics["digit"])
 print("\\nprecision / recall / F1 por clase:")

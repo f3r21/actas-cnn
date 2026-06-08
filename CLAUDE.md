@@ -111,10 +111,13 @@ El backlog detallado esta en `docs/05-backlog.md`.
 
 ## Arquitectura
 
-**El entregable es un notebook que corre en Colab de punta a punta**
-(`notebooks/02_entregable_colab.ipynb`): desde las actas (PDFs) hasta las
-metricas finales, autonomo (codigo inline, no clona el repo). El resto del repo
-es el "laboratorio" que lo respalda. Tres capas:
+**El entregable son dos notebooks de Colab** que separan el preprocesamiento del
+modelo, comunicados por el bundle de crops en HF:
+`notebooks/01_preprocesamiento_colab.ipynb` (actas PDFs -> crops -> publica
+bundle en HF; superficie que mas se itera) y
+`notebooks/02_entregable_colab.ipynb` (baja los crops -> entrena -> evalua ->
+metricas). Ambos autonomos (codigo inline, no clonan el repo). El resto del repo
+es el "laboratorio" que los respalda. Tres capas:
 
 1. **`src/actas_cnn/`** — paquete, fuente de verdad del pipeline. Los notebooks
    inline-an su logica (DRY via `tools/build_notebooks.py`); `scripts/` son
@@ -206,7 +209,8 @@ python tools/build_notebooks.py
 ```
 
 Entrenamiento en GPU gratis: abrir `notebooks/02_entregable_colab.ipynb`
-en Colab (T4, flujo end-to-end tokenless desde el dataset HF publico).
+en Colab (T4, baja los crops preprocesados del dataset HF publico y entrena;
+prerequisito: `01_preprocesamiento_colab.ipynb` publico el bundle una vez).
 
 ## Datos en disco (tras limpieza de disco 2026-06-01)
 

@@ -49,10 +49,11 @@ nunca da problema.
 
 ## Portabilidad (redundancia de GPU)
 
-- `notebooks/02_entregable_colab.ipynb` corre end-to-end en Colab: es
-  autonomo (codigo inline), baja datos del HF dataset publico (sin token) y
-  entrena/evalua. El preprocesamiento de las 5,000 actas vive en
-  `notebooks/01_preprocesamiento_colab.ipynb`.
+- `notebooks/02_entregable_colab.ipynb` (modelo + evaluacion) corre en Colab:
+  es autonomo (codigo del modelo inline), baja los crops preprocesados del HF
+  dataset publico (sin token) y entrena/evalua. El preprocesamiento de las 5,000
+  actas vive aparte en `notebooks/01_preprocesamiento_colab.ipynb`, que publica
+  el bundle de crops que este consume.
 - Tokens via secretos de Kaggle/Colab; nunca hardcodear.
 
 ## Metricas y evaluacion

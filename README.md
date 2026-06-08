@@ -27,21 +27,21 @@ Detalle completo del proyecto y del pipeline en
 
 ## Entregable
 
-El entregable es **un notebook que corre en Colab de punta a punta**, desde las
-actas (PDFs) hasta las metricas finales:
-
-- **[`notebooks/02_entregable_colab.ipynb`](notebooks/02_entregable_colab.ipynb)** —
-  abrir en Colab, `Runtime → Change runtime type → T4 GPU`, `Run all`. Es
-  autonomo (lleva todo el codigo inline; no clona el repo) y baja los datos del
-  HF dataset publico. Por defecto consume los crops ya preprocesados
-  (`MODO="cache"`, ~12 min); con `MODO="full"` procesa `N_ACTAS` actas desde el
-  PDF. `CARGAR_CHECKPOINT=True` reproduce los numeros oficiales exactos.
+El entregable son **dos notebooks de Colab** que separan el preprocesamiento
+(lo que mas se itera) del modelo, comunicados por el bundle de crops en HF:
 
 - **[`notebooks/01_preprocesamiento_colab.ipynb`](notebooks/01_preprocesamiento_colab.ipynb)** —
   preprocesa las 5,000 actas (render → deteccion de digitos → crops → manifests)
   y **publica el bundle de crops en HF**. Es la superficie que mas se itera:
   para cambiar *como se detectan los digitos* se edita aca y se re-publica; el
-  entregable consume la ultima version.
+  notebook del modelo consume la ultima version.
+
+- **[`notebooks/02_entregable_colab.ipynb`](notebooks/02_entregable_colab.ipynb)** —
+  modelo + evaluacion: abrir en Colab, `Runtime → Change runtime type → T4 GPU`,
+  `Run all`. Es autonomo (lleva el codigo del modelo inline; no clona el repo) y
+  baja los crops preprocesados del HF dataset publico (prerequisito: `01` corrio
+  una vez). Entrena (~5-8 min en T4) y reporta las metricas finales;
+  `CARGAR_CHECKPOINT=True` reproduce los numeros oficiales exactos.
 
 ## Reproduccion local (paquete)
 
