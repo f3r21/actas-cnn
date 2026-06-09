@@ -21,7 +21,6 @@ import _inline_code as C
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = json.loads((ROOT / "templates.json").read_text())
 HF_DATASET_REPO = "f3r21/actas-cnn-dataset"
-HF_MODEL_REPO = "f3r21/actas-cnn-model"
 
 
 def md(text: str):
@@ -59,7 +58,6 @@ if DEVICE.type != "cuda":
           "Sin GPU el entrenamiento es MUY lento.")
 
 HF_DATASET_REPO = "{HF_DATASET_REPO}"   # PDFs + labels (+ crops_bundle si 01 ya corrio)
-HF_MODEL_REPO   = "{HF_MODEL_REPO}"     # checkpoints
 
 WORK = Path("/content") if Path("/content").exists() else Path(".").resolve()
 DATA = WORK / "data"; DATA.mkdir(parents=True, exist_ok=True)
@@ -171,9 +169,7 @@ else:
 # === Notebook 02: entregable ================================================
 
 def build_entregable() -> nbf.NotebookNode:
-    config = '''# CARGAR_CHECKPOINT=True baja el checkpoint oficial de HF (numeros exactos);
-# False entrena fresco (~5-8 min en T4).
-CARGAR_CHECKPOINT = False
+    config = '''# Epochs de entrenamiento (~5-8 min en T4 con 20).
 EPOCHS = 20'''
     cells = [
         md("# actas-cnn — Modelo + evaluacion (Colab)\n\n"
@@ -188,8 +184,8 @@ EPOCHS = 20'''
            "| metrica (val, 693 actas) | esperado |\n|---|---|\n"
            "| digit-level | ~98.1% |\n| field-level | ~98.9% |\n"
            "| acta-level (42 campos) | ~90.3% |\n| reconstruccion del total (MAE) | ~2.4 votos |\n\n"
-           "Un train fresco varia +-0.5pp por el seed; `CARGAR_CHECKPOINT=True` reproduce "
-           "los numeros exactos del checkpoint oficial."),
+           "Un train fresco varia +-0.5pp por el seed; los resultados de cada corrida "
+           "quedan en las salidas del notebook."),
         md("## 0. Setup"),
         code(C.INSTALL),
         code(config_cell(config)),
@@ -219,18 +215,8 @@ except Exception as e:
                        "01_preprocesamiento_colab.ipynb primero.") from e
 with tarfile.open(bundle) as t: t.extractall(WORK)
 print("crops_bundle extraido")'''),
-        md("## 3. Entrenamiento (o cargar el checkpoint oficial)"),
-        code('''if CARGAR_CHECKPOINT:
-    try:
-        ckpt = hf_hub_download(HF_MODEL_REPO, "resnet18_best.pt", repo_type="model")
-    except Exception as e:
-        raise RuntimeError("Checkpoint no publicado en HF todavia. Usa "
-                           "CARGAR_CHECKPOINT=False para entrenar, o sube el .pt primero.") from e
-    state = torch.load(ckpt, map_location=DEVICE, weights_only=False)
-    model = resnet18_cifar(1, 10).to(DEVICE); model.load_state_dict(state["model"])
-    print("checkpoint oficial cargado (val_acc", round(float(state.get("acc", 0)), 4), ")")
-else:
-    model = train_model(DATA / "manifest_train.csv", DATA / "crops_train", DEVICE, epochs=EPOCHS)'''),
+        md("## 3. Entrenamiento"),
+        code('''model = train_model(DATA / "manifest_train.csv", DATA / "crops_train", DEVICE, epochs=EPOCHS)'''),
         md("## 4. Evaluacion + metricas finales"),
         code('''df, res = evaluate_split(model, DATA / "manifest_val.csv", DATA / "crops_val",
                          TEMPLATE, archivos, votos, cabecera, DEVICE)

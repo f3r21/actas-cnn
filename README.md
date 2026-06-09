@@ -40,8 +40,8 @@ El entregable son **dos notebooks de Colab** que separan el preprocesamiento
   modelo + evaluacion: abrir en Colab, `Runtime → Change runtime type → T4 GPU`,
   `Run all`. Es autonomo (lleva el codigo del modelo inline; no clona el repo) y
   baja los crops preprocesados del HF dataset publico (prerequisito: `01` corrio
-  una vez). Entrena (~5-8 min en T4) y reporta las metricas finales;
-  `CARGAR_CHECKPOINT=True` reproduce los numeros oficiales exactos.
+  una vez). Entrena (~5-8 min en T4) y reporta las metricas finales; los
+  resultados de cada corrida quedan en las salidas del notebook.
 
 ## Reproduccion local (paquete)
 
