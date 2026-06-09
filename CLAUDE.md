@@ -17,7 +17,7 @@ electorales de las Elecciones Generales del Peru 2026.
   `docs/06-definicion-proyecto.md`.
 - Presentacion final: 18/06/2026.
 
-## Estado actual (2026-06-03, Semana 2 cerrada: ResNet-18 + ablations entrenadas)
+## Estado actual (2026-06-09, comparativa de ablations cerrada)
 
 - **Pipeline operativo end-to-end**: PDF → PNG → field crops → digit
   crops con labels desde parquets → manifest CSV → CNN entrenada.
@@ -38,12 +38,21 @@ electorales de las Elecciones Generales del Peru 2026.
 - **Linea de referencia**: la CNN custom de Semana 1 (Conv+BN+
   LeakyReLU+Dropout) alcanzo 97.77% val_acc digit-level; ResNet-18
   mejora +0.35pp solo cambiando la arquitectura.
-- **Ablations entrenadas y evaluadas** (Semana 2; falta consolidar la
-  tabla comparativa para el informe): checkpoints `resnet18_ls_ra_best.pt`
-  (label smoothing + RandAugment) y `resnet18_ls_ra_mu_cos_best.pt`
-  (+ mixup + cosine LR), cada uno con su `data/evaluate_val_ls_ra*.csv`.
-  La base sin augmentation (`resnet18_best.pt`) es la oficial reportada
-  arriba hasta cerrar la comparativa.
+- **Ablations: comparativa cerrada (2026-06-09)**. Las 3 variantes
+  re-evaluadas con `scripts/evaluate.py --split val` y consolidadas con
+  `scripts/ablation_table.py` (tabla completa en
+  `docs/04-modelo-entrenamiento.md`, resumen en
+  `data/ablations_summary.csv`, logs en `data/evaluate_val*.log`):
+  `ls_ra_mu_cos` (label smoothing + RandAugment + mixup + cosine LR)
+  domina en todas las metricas — digit 98.21%, field 98.93%, acta-level
+  92.21% (+1.88pp vs base), reconstruccion exacta 95.24%, MAE 2.18.
+  `resnet18_best.pt` (base) sigue siendo el checkpoint publicado en HF
+  y el de las metricas oficiales de arriba; promover `ls_ra_mu_cos` a
+  oficial es decision pendiente del usuario.
+- **Evaluacion extendida ya generada**: matriz de confusion 10x10,
+  per-class precision/recall/F1, histograma de errores y ranking
+  worst-20 (`data/visualizaciones/evaluate_confusion_val.png`,
+  `evaluate_error_hist_val.png`, `data/evaluate_worst20_val.csv`).
 - **Experimento de solver (post-procesamiento, sin codigo en el repo)**:
   hay artefactos `data/eval_with_solver_val_K*_tol*.csv` (2026-05-27,
   columnas `baseline` vs `solver` por campo, barriendo top-K y
@@ -78,20 +87,20 @@ electorales de las Elecciones Generales del Peru 2026.
   digital, no manuscrito). Filtrados; pipeline solo trabaja con
   manuscritos puros.
 
-## Prioridad actual (Semana 3-4, presentacion 18-jun)
+## Prioridad actual (cierre)
 
-El modelado esta esencialmente cerrado: ResNet-18 CIFAR implementada y
-entrenada, ablations (ls+ra, +mixup+cosine) entrenadas y evaluadas, y
-`scripts/evaluate.py` ya da field/acta-level + reconstruccion del total.
-Lo que queda:
+El modelado y la evaluacion estan cerrados (tabla de ablations
+consolidada, matriz de confusion y per-class generadas). **No hay
+informe ni slides que entregar** (decision del 2026-06-09). Lo poco
+que queda:
 
-1. **Consolidar la tabla comparativa de ablations** (base vs ls_ra vs
-   ls_ra_mu_cos) desde los `data/evaluate_val_*.csv` para el Cap. 4.
-2. **Extender la evaluacion**: matriz de confusion 10x10, precision/
-   recall/F1 por clase, curvas train/val.
-3. **Redactar el informe** (capitulos 1-5) y armar slides (20 min).
-4. **Reproducibilidad / cierre**: README de setup, dataset + checkpoint
-   publicados en HF (hecho).
+1. **Decidir el modelo oficial**: `ls_ra_mu_cos` gana en todas las
+   metricas; si se promueve, re-publicar el checkpoint en HF y
+   actualizar README/CLAUDE.
+2. **Verificar `02_modelo_colab.ipynb` end-to-end** consumiendo el
+   `crops_bundle.tar.gz` publicado el 2026-06-09.
+3. Opcional: evaluar sobre el split `test` (todas las metricas
+   reportadas son de val) y refrescar `AUDIT_REPORT.md` (es del 26-may).
 
 El backlog detallado esta en `docs/05-backlog.md`.
 
@@ -158,6 +167,8 @@ callable a `build_crops_for_acta` (o edita el bloque PREPROCESS de
 
 - `scripts/preview_template.py`, `scripts/preview_crops.py`: QA visual.
 - `scripts/audit.py`: auditoria de claims del dataset/modelo.
+- `scripts/ablation_table.py`: consolida la tabla comparativa de
+  ablations desde los logs/CSVs de `scripts/evaluate.py`.
 - `scripts/run_week1_clean_pipeline.sh`: regenera todo Semana 1.
 - `tools/build_notebooks.py`: genera los notebooks Colab desde el paquete.
 
@@ -242,4 +253,5 @@ descargable con `huggingface_hub` si se pierde el local.
 > Nota de nomenclatura: el `data_bundle.tar.gz` borrado arriba era el bundle
 > viejo (crops + manifests + parquets). El bundle nuevo que consume el
 > entregable se llama `crops_bundle.tar.gz` y lo publica
-> `notebooks/01_preprocesamiento_colab.ipynb` (aun no esta en HF).
+> `notebooks/01_preprocesamiento_colab.ipynb` (publicado en HF el
+> 2026-06-09; verificado en `f3r21/actas-cnn-dataset`).

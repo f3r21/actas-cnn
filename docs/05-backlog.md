@@ -1,6 +1,7 @@
 # 05 - Backlog priorizado
 
-Orden de trabajo. Estado actualizado al 2026-05-22 (Semana 1 cerrada).
+Orden de trabajo. Estado actualizado al 2026-06-09 (comparativa de
+ablations cerrada; informe y slides descartados por decision del curso).
 
 > **Nota (reorganizacion):** el codigo se movio al paquete `src/actas_cnn/`
 > (`model.py`→`actas_cnn.model`, `train.py`→`actas_cnn.training`,
@@ -38,13 +39,14 @@ Orden de trabajo. Estado actualizado al 2026-05-22 (Semana 1 cerrada).
       acta-level bajo -0.72pp vs zonal viejo. Rollback completo. El
       techo no esta en preprocesamiento. Util para Cap 4 del informe
       como ablation honesta.
-- [ ] Ablations de regularizacion sobre ResNet-18: RandAugment, label
-      smoothing, mixup, cosine LR schedule. Esperar +0.3-0.5pp digit.
-- [ ] Ablation: con/sin residual (para evidenciar el aporte de skip
-      connections).
-- [ ] Ablation: profundidad ResNet-18 vs ResNet-34.
-- [ ] Ablation: augmentation policy (sin, RandomAffine, RandAugment).
-- [ ] Ablation: con/sin label smoothing.
+- [x] Ablations de regularizacion sobre ResNet-18: label smoothing +
+      RandAugment (`ls_ra`) y + mixup + cosine LR (`ls_ra_mu_cos`).
+      **Comparativa cerrada 2026-06-09** (tabla en
+      `docs/04-modelo-entrenamiento.md` y `data/ablations_summary.csv`):
+      ls_ra_mu_cos domina en todo — digit 98.21% (+0.09pp), acta-level
+      92.21% (+1.88pp), reconstruccion exacta 95.24% (+1.44pp), MAE 2.18.
+- [ ] Ablation: con/sin residual (no realizada; trabajo futuro).
+- [ ] Ablation: profundidad ResNet-18 vs ResNet-34 (no realizada).
 - [ ] Pre-entreno en MNIST opcional: pretrained vs from-scratch.
 - [ ] Class weighting o focal loss para reducir bias hacia label 1.
 - [ ] Tracking en Weights & Biases por configuracion.
@@ -55,34 +57,32 @@ Orden de trabajo. Estado actualizado al 2026-05-22 (Semana 1 cerrada).
   - [x] Field-level accuracy (3-4 digitos juntos por campo).
   - [x] Acta-level accuracy (todos los 42 campos correctos).
   - [x] Reconstruccion total: suma vs `totalVotosEmitidos`.
-- [ ] Extender evaluate.py: matriz de confusion 10x10, per-class
+- [x] Extender evaluate.py: matriz de confusion 10x10, per-class
       precision/recall/F1, histograma de errores por acta, ranking
-      de actas peor reconstruidas.
+      de actas peor reconstruidas (PNGs en `data/visualizaciones/`,
+      worst-20 en `data/evaluate_worst20_val.csv`).
+- [x] Consolidar tabla comparativa de ablations
+      (`scripts/ablation_table.py` -> `data/ablations_summary.csv`).
 
-## P3 - Informe y presentacion (Semana 3-4, 18/06/2026)
+## P3 - Informe y presentacion (DESCARTADO 2026-06-09)
 
-- [ ] Redactar Cap 1-3 del informe (intro + trabajos relacionados +
-      metodologia). Usar skill `paper-structure-cs` y
-      `abstract-methods-results-cs`.
-- [ ] Cap 4 (Resultados): tabla principal de ablations sobre ResNet-18
-      (residual on/off, depth, augmentation, label smoothing), matriz
-      de confusion, curvas train/val por epoch.
-- [ ] Cap 5 (Discusion): limitaciones, comparacion contra SOTA en MNIST,
-      trabajo futuro (otros layouts, STAE multi-page, segmentacion
-      mejorada).
-- [ ] Figuras del pipeline (mermaid o tikz).
-- [ ] Slides (20 min) con `paper-structure-cs` adaptado a presentacion.
-- [ ] Auditar informe con skill `academic-final-review-cs` y
-      `defending-empirical-methods-cs`.
+> No hay informe ni slides que entregar (confirmado 2026-06-09). Los
+> items historicos se conservan solo como referencia; el material de
+> respaldo (tabla de ablations, matriz de confusion, figuras) quedo
+> generado igualmente en `docs/04` y `data/visualizaciones/`.
 
-## P4 - Reproducibilidad y publicacion (Semana 4)
+## P4 - Reproducibilidad y publicacion (casi cerrado)
 
-- [ ] README de "como reproducir": setup, comandos, link a dataset HF
+- [x] README de "como reproducir": setup, comandos, link a dataset HF
       y checkpoints.
-- [ ] Subir dataset publico a Hugging Face (manuscritas + manifest).
-- [ ] Subir mejor checkpoint a HF + W&B.
+- [x] Subir dataset publico a Hugging Face (`f3r21/actas-cnn-dataset`:
+      5,000 PDFs + labels + `crops_bundle.tar.gz`).
+- [x] Subir mejor checkpoint a HF (`f3r21/actas-cnn-model`:
+      `resnet18_best.pt`). W&B descartado.
+- [x] Publicar `crops_bundle.tar.gz` en HF (`01` lo publico el
+      2026-06-09; fixes de Colab sincronizados en `tools/`).
 - [ ] Verificar que `notebooks/02_modelo_colab.ipynb` corre end-to-end
-      en Colab sin cambios (publicar `crops_bundle.tar.gz` + checkpoint en HF).
+      en Colab consumiendo el bundle nuevo (unico pendiente de cierre).
 
 ## Config a rellenar antes de Semana 4
 

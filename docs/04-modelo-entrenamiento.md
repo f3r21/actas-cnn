@@ -18,10 +18,10 @@ ResNet de ImageNet:
 - Cuatro etapas con 2 bloques cada una (canales 64 → 128 → 256 → 512).
 - Global Average Pool al final, luego Linear a 10 clases.
 
-Modelo a entrenar en Semana 2. Se conserva la antigua CNN custom
-(Conv+BN+LeakyReLU+Dropout) en `actas_cnn.model` como linea de referencia
-metodologica (alcanzo 97.77% val_acc en 5 epochs), pero el modelo del
-entregable y del informe es ResNet-18 CIFAR.
+Entrenado en Semana 2 (base + 2 ablations, ver tabla abajo). Se conserva
+la antigua CNN custom (Conv+BN+LeakyReLU+Dropout) en `actas_cnn.model`
+como linea de referencia metodologica (alcanzo 97.77% val_acc en 5
+epochs), pero el modelo del entregable es ResNet-18 CIFAR.
 
 ## Linea de referencia (Semana 1)
 
@@ -58,32 +58,45 @@ nunca da problema.
 
 ## Metricas y evaluacion
 
-**Implementadas en `actas_cnn.training`**:
-- Exactitud por digito (digit-level accuracy).
+Todas implementadas en `actas_cnn.evaluate` (wrapper `scripts/evaluate.py`):
 
-**Pendientes para `scripts/evaluate.py`** (Semana 2-3):
-- Exactitud por campo (3 digitos juntos = un numero correcto).
+- Exactitud por digito (digit-level accuracy).
+- Exactitud por campo (los 3-4 digitos juntos = un numero correcto).
 - Exactitud por acta (todos los 42 campos correctos).
 - Reconstruccion del total: suma(partidos) + blanco + nulos +
-  impugnados vs `actas_cabecera.totalVotosEmitidos`. |Error| medio,
+  impugnados vs `actas_cabecera.totalVotosEmitidos`. MAE, mediana,
   histograma, % actas con error 0.
-- Matriz de confusion 10×10.
-- Per-class precision/recall/F1.
+- Matriz de confusion 10×10 y per-class precision/recall/F1
+  (PNG en `data/visualizaciones/`).
+- Ranking de las 20 actas peor reconstruidas
+  (`data/evaluate_worst20_val.csv`).
 
-## Pendientes de mejora (Semana 2-3)
+## Ablations (Semana 2, comparativa cerrada 2026-06-09)
 
-- Implementar `ResNet18CIFAR` en `model.py` y exponerlo via
-  `build_model("resnet18", ...)`.
-- Entrenar 20 epochs con augmentation moderada (RandAugment) y label
-  smoothing.
-- Ablations: con/sin residual (para mostrar el aporte de skip
-  connections), profundidad (ResNet-18 vs ResNet-34), augmentation
-  policy.
+Tres variantes de ResNet-18 CIFAR entrenadas 20 epochs sobre el mismo
+dataset y split. Re-evaluadas el 2026-06-09 con `scripts/evaluate.py
+--split val` (693 actas, 29,106 campos) y consolidadas con
+`scripts/ablation_table.py` (resumen en `data/ablations_summary.csv`,
+logs `data/evaluate_val*.log`):
+
+| Variante | Config | Digit | Field | Acta | Recon. exacta | MAE |
+|---|---|---|---|---|---|---|
+| base | sin augmentation | 98.12% | 98.87% | 90.33% (626/693) | 93.80% (650/693) | 2.40 |
+| ls_ra | label smoothing + RandAugment | 98.16% | 98.90% | 91.49% (634/693) | 94.52% (655/693) | 2.20 |
+| ls_ra_mu_cos | + mixup + cosine LR | 98.21% | 98.93% | 92.21% (639/693) | 95.24% (660/693) | 2.18 |
+
+Lectura: la regularizacion gana poco a nivel digito (+0.09pp) pero el
+efecto se compone en las metricas agregadas — acta-level sube +1.88pp
+(13 actas mas perfectas) y la reconstruccion exacta +1.44pp. La
+combinacion completa (`ls_ra_mu_cos`) domina en todas las metricas.
+`resnet18_best.pt` (base) sigue siendo el checkpoint publicado en HF;
+promover `ls_ra_mu_cos` es decision pendiente.
+
+## Mejoras no exploradas (trabajo futuro)
+
+- Ablations: con/sin residual, profundidad (ResNet-18 vs ResNet-34).
 - Class weighting o focal loss (label 1 representa 34%, sesga
   predicciones).
-- Early stopping y scheduler de LR (cosine annealing).
 - Pre-entreno opcional en MNIST/SVHN (transfer learning) — ablation
   contra el modelo from-scratch.
 - Tracking en Weights & Biases con tags por configuracion.
-- Empaquetar los recortes (parquet/webdataset/tar) para carga rapida
-  en la nube si fuera necesario escalar.

@@ -22,6 +22,19 @@ Topicos en Inteligencia Artificial (CCOMP9-1).
 Modelo: **ResNet-18 estilo CIFAR** (He et al., 2015), 11.17M params,
 adaptada a entrada 32×32 px en escala de grises.
 
+### Ablations de regularizacion (val set)
+
+| Variante | Config | Digit | Field | Acta | Recon. exacta | MAE |
+|---|---|---|---|---|---|---|
+| base | sin augmentation | 98.12% | 98.87% | 90.33% | 93.80% | 2.40 |
+| ls_ra | label smoothing + RandAugment | 98.16% | 98.90% | 91.49% | 94.52% | 2.20 |
+| ls_ra_mu_cos | + mixup + cosine LR | **98.21%** | **98.93%** | **92.21%** | **95.24%** | **2.18** |
+
+La regularizacion gana poco a nivel digito pero el efecto se compone en
+las metricas agregadas (+1.88pp acta-level). Tabla reproducible con
+`scripts/ablation_table.py` (detalle en
+[`docs/04-modelo-entrenamiento.md`](docs/04-modelo-entrenamiento.md)).
+
 Detalle completo del proyecto y del pipeline en
 [`CLAUDE.md`](CLAUDE.md) y en [`docs/`](docs/).
 
