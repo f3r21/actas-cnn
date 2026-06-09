@@ -5,7 +5,7 @@ Orden de trabajo. Estado actualizado al 2026-05-22 (Semana 1 cerrada).
 > **Nota (reorganizacion):** el codigo se movio al paquete `src/actas_cnn/`
 > (`model.py`→`actas_cnn.model`, `train.py`→`actas_cnn.training`,
 > `scripts/evaluate.py`→`actas_cnn.evaluate`). El entregable es
-> `notebooks/02_entregable_colab.ipynb`. Los items historicos abajo mantienen
+> `notebooks/02_modelo_colab.ipynb`. Los items historicos abajo mantienen
 > los nombres de la epoca.
 
 ## P0 - Dataset (COMPLETADO)
@@ -81,7 +81,7 @@ Orden de trabajo. Estado actualizado al 2026-05-22 (Semana 1 cerrada).
       y checkpoints.
 - [ ] Subir dataset publico a Hugging Face (manuscritas + manifest).
 - [ ] Subir mejor checkpoint a HF + W&B.
-- [ ] Verificar que `notebooks/02_entregable_colab.ipynb` corre end-to-end
+- [ ] Verificar que `notebooks/02_modelo_colab.ipynb` corre end-to-end
       en Colab sin cambios (publicar `crops_bundle.tar.gz` + checkpoint en HF).
 
 ## Config a rellenar antes de Semana 4

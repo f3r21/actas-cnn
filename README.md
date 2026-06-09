@@ -1,6 +1,6 @@
 # actas-cnn
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/f3r21/actas-cnn/blob/main/notebooks/02_entregable_colab.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/f3r21/actas-cnn/blob/main/notebooks/02_modelo_colab.ipynb)
 
 Reconocimiento automatico y agregacion de votos manuscritos en actas
 electorales presidenciales del Peru (Elecciones Generales 2026) con
@@ -36,12 +36,18 @@ El entregable son **dos notebooks de Colab** que separan el preprocesamiento
   para cambiar *como se detectan los digitos* se edita aca y se re-publica; el
   notebook del modelo consume la ultima version.
 
-- **[`notebooks/02_entregable_colab.ipynb`](notebooks/02_entregable_colab.ipynb)** —
+- **[`notebooks/02_modelo_colab.ipynb`](notebooks/02_modelo_colab.ipynb)** —
   modelo + evaluacion: abrir en Colab, `Runtime → Change runtime type → T4 GPU`,
   `Run all`. Es autonomo (lleva el codigo del modelo inline; no clona el repo) y
   baja los crops preprocesados del HF dataset publico (prerequisito: `01` corrio
   una vez). Entrena (~5-8 min en T4) y reporta las metricas finales; los
   resultados de cada corrida quedan en las salidas del notebook.
+
+Ambos se generan desde el paquete con `python tools/build_notebooks.py` (editar
+los bloques en `tools/_inline_code.py`, no el `.ipynb`). Se iteran por separado:
+`01` solo lleva el preprocesamiento y `02` solo el modelo; lo unico que los
+acopla son los datos, asi que si cambias la deteccion de digitos hay que re-correr
+`01` en Colab para republicar el bundle antes de que `02` lo refleje.
 
 ## Reproduccion local (paquete)
 
@@ -148,7 +154,7 @@ scripts/                  wrappers CLI delgados (repro / testing)
 
 notebooks/
   01_preprocesamiento_colab.ipynb   PDFs HF -> crops -> publica bundle en HF
-  02_entregable_colab.ipynb         *** ENTREGABLE *** crops -> train -> eval -> metricas
+  02_modelo_colab.ipynb             crops -> train -> eval -> metricas
 
 experiments/              fuera del hot path (pruebas / experimentos)
   fiducial/               localizador alternativo por marcadores (exp. negativo)

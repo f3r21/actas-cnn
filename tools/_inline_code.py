@@ -233,6 +233,8 @@ def train_model(manifest, root, device, epochs=20, lr=5e-4, batch_size=128,
 
 # --- Evaluacion downstream (digit/field/acta-level + reconstruccion) ---------
 EVAL = r'''# === Evaluacion downstream: digit / field / acta-level + reconstruccion del total ===
+import numpy as np
+
 def parse_crop_path(rel):
     """'<label>/<aid>_<field>_c<pos>.png' -> (aid, field, pos)."""
     parts = Path(rel).stem.split("_")
@@ -299,6 +301,7 @@ def report_metrics(df, res):
 
 # --- Metricas para el informe: confusion, P/R/F1, ablations ------------------
 METRICS = r'''# === Metricas para el informe: matriz de confusion, P/R/F1 por clase, ablations ===
+import numpy as np
 import matplotlib.pyplot as plt
 
 def confusion_and_prf(df):

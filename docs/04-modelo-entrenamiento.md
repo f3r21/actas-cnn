@@ -49,7 +49,7 @@ nunca da problema.
 
 ## Portabilidad (redundancia de GPU)
 
-- `notebooks/02_entregable_colab.ipynb` (modelo + evaluacion) corre en Colab:
+- `notebooks/02_modelo_colab.ipynb` (modelo + evaluacion) corre en Colab:
   es autonomo (codigo del modelo inline), baja los crops preprocesados del HF
   dataset publico (sin token) y entrena/evalua. El preprocesamiento de las 5,000
   actas vive aparte en `notebooks/01_preprocesamiento_colab.ipynb`, que publica

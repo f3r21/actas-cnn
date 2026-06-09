@@ -115,7 +115,7 @@ El backlog detallado esta en `docs/05-backlog.md`.
 modelo, comunicados por el bundle de crops en HF:
 `notebooks/01_preprocesamiento_colab.ipynb` (actas PDFs -> crops -> publica
 bundle en HF; superficie que mas se itera) y
-`notebooks/02_entregable_colab.ipynb` (baja los crops -> entrena -> evalua ->
+`notebooks/02_modelo_colab.ipynb` (baja los crops -> entrena -> evalua ->
 metricas). Ambos autonomos (codigo inline, no clonan el repo). El resto del repo
 es el "laboratorio" que los respalda. Tres capas:
 
@@ -208,7 +208,7 @@ python scripts/audit.py   # genera AUDIT_REPORT.md
 python tools/build_notebooks.py
 ```
 
-Entrenamiento en GPU gratis: abrir `notebooks/02_entregable_colab.ipynb`
+Entrenamiento en GPU gratis: abrir `notebooks/02_modelo_colab.ipynb`
 en Colab (T4, baja los crops preprocesados del dataset HF publico y entrena;
 prerequisito: `01_preprocesamiento_colab.ipynb` publico el bundle una vez).
 

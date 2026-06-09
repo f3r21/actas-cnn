@@ -1,16 +1,23 @@
-"""Genera los notebooks Colab entregables desde los bloques de `_inline_code`.
+"""Genera los notebooks Colab desde los bloques de `_inline_code`.
 
 Fuente de verdad de los notebooks: este script + tools/_inline_code.py. Re-correr
-tras cambiar el preprocesamiento (PREPROCESS) o cualquier bloque inline:
+tras editar cualquier bloque inline:
 
     python tools/build_notebooks.py
 
-Produce:
-  notebooks/01_preprocesamiento_colab.ipynb  (PDFs HF -> crops -> sube a HF)
-  notebooks/02_entregable_colab.ipynb         (crops -> train -> eval -> metricas)
+Produce (cada uno consume sus propios bloques; se iteran por separado):
+  notebooks/01_preprocesamiento_colab.ipynb  bloques PREPROCESS + LABELS_BUILD
+                                             (PDFs HF -> crops -> publica bundle en HF)
+  notebooks/02_modelo_colab.ipynb            bloques MODEL + DATASET + TRAIN + EVAL + METRICS
+                                             (baja crops del bundle -> train -> eval -> metricas)
+
+Lo unico que acopla 01 y 02 son los datos, no el codigo: si cambias el bloque
+PREPROCESS, re-corre 01 en Colab para republicar crops_bundle.tar.gz antes de que
+02 lo refleje. Al final este script valida que ambos notebooks parsean.
 """
 from __future__ import annotations
 
+import ast
 import json
 from pathlib import Path
 
@@ -42,9 +49,8 @@ CELL_TEMPLATE = ("# Plantilla Presidencial: 42 campos (38 partidos + blanco/nulo
 
 def config_cell(modo_block: str) -> str:
     return f'''# === Config + entorno ===
-import os, tarfile, random
+import os, tarfile
 from pathlib import Path
-import numpy as np
 import pandas as pd
 import torch
 
@@ -85,7 +91,8 @@ def build_preprocesamiento() -> nbf.NotebookNode:
         code(C.PREPROCESS),
         code(C.LABELS_BUILD),
         md("## 2. Descargar PDFs + labels de Hugging Face"),
-        code('''from huggingface_hub import hf_hub_download, snapshot_download
+        code('''import random
+from huggingface_hub import hf_hub_download, snapshot_download
 snapshot_download(HF_DATASET_REPO, repo_type="dataset", allow_patterns="labels/*",
                   local_dir=str(DATA))
 archivos = pd.read_parquet(DATA / "labels/actas_archivos.parquet")
@@ -144,7 +151,8 @@ for ax, c in zip(axs, celdas["partido_01"]):
     ax.imshow(c, cmap="gray"); ax.axis("off")
 fig.suptitle("partido_01 -> 3 celdas (right-justified)"); plt.show()'''),
         md("## 5. Empaquetar y publicar el bundle de crops en HF\n\n"
-           "El entregable (`02_*`) baja este `crops_bundle.tar.gz` en `MODO=\"cache\"`."),
+           "El notebook del modelo (`02_modelo_colab.ipynb`) baja este "
+           "`crops_bundle.tar.gz`."),
         code('''bundle = WORK / "crops_bundle.tar.gz"
 with tarfile.open(bundle, "w:gz") as t:
     for split in ("train", "val", "test"):
@@ -160,15 +168,15 @@ if SUBIR_A_HF:
     print("subido a", HF_DATASET_REPO)
 else:
     print("SUBIR_A_HF=False: el bundle quedo local. Ponlo en True (con HF_TOKEN) para publicar.")'''),
-        md("---\nListo. Con el bundle publicado, abre **`02_entregable_colab.ipynb`** "
-           "(`MODO=\"cache\"`) para entrenar y obtener las metricas finales."),
+        md("---\nListo. Con el bundle publicado, abre **`02_modelo_colab.ipynb`** "
+           "para entrenar y obtener las metricas finales."),
     ]
     return _nb(cells)
 
 
-# === Notebook 02: entregable ================================================
+# === Notebook 02: modelo ====================================================
 
-def build_entregable() -> nbf.NotebookNode:
+def build_modelo() -> nbf.NotebookNode:
     config = '''# Epochs de entrenamiento (~5-8 min en T4 con 20).
 EPOCHS = 20'''
     cells = [
@@ -258,13 +266,37 @@ def _nb(cells) -> nbf.NotebookNode:
     return nb
 
 
+def _validate(path: Path) -> None:
+    """Re-lee el notebook escrito, valida nbformat y parsea cada celda de codigo.
+
+    Las magics de Colab (lineas que empiezan con % o !) no son Python valido; se
+    omiten antes de parsear. Lanza si algo no valida/parsea para no publicar un
+    notebook roto.
+    """
+    nb = nbf.read(str(path), as_version=4)
+    nbf.validate(nb)
+    for i, c in enumerate(nb.cells):
+        if c.cell_type != "code":
+            continue
+        src = "\n".join(l for l in c.source.split("\n")
+                        if not l.lstrip().startswith(("%", "!")))
+        try:
+            ast.parse(src)
+        except SyntaxError as e:
+            raise SyntaxError(f"{path.name} celda {i}: {e}") from e
+
+
 def main() -> None:
     out = ROOT / "notebooks"
-    nbf.write(build_preprocesamiento(), str(out / "01_preprocesamiento_colab.ipynb"))
-    nbf.write(build_entregable(), str(out / "02_entregable_colab.ipynb"))
+    outputs = {
+        out / "01_preprocesamiento_colab.ipynb": build_preprocesamiento(),
+        out / "02_modelo_colab.ipynb": build_modelo(),
+    }
     print("escritos:")
-    print("  notebooks/01_preprocesamiento_colab.ipynb")
-    print("  notebooks/02_entregable_colab.ipynb")
+    for path, nb in outputs.items():
+        nbf.write(nb, str(path))
+        _validate(path)
+        print(f"  notebooks/{path.name}  (valida + parsea)")
 
 
 if __name__ == "__main__":
