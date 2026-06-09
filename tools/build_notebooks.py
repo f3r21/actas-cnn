@@ -90,9 +90,13 @@ def build_preprocesamiento() -> nbf.NotebookNode:
         md("## 1. PREPROCESAMIENTO — deteccion de digitos (editar aqui)"),
         code(C.PREPROCESS),
         code(C.LABELS_BUILD),
-        md("## 2. Labels + universo de actas publicadas"),
-        code('''import random
-from huggingface_hub import hf_hub_download, snapshot_download, list_repo_files
+        md("## 2. Labels, universo y descarga de PDFs\n\n"
+           "Descarga **en una sola pasada paralela** (`snapshot_download`, una barra de "
+           "progreso) en vez de 5000 descargas con 5000 barras, que congelan el front-end "
+           "de Colab. Con `HF_TOKEN` puesto va mas rapido (sin rate-limit de anonimo)."),
+        code('''import random, logging
+logging.getLogger("huggingface_hub").setLevel(logging.ERROR)  # 1 aviso, no 5000
+from huggingface_hub import snapshot_download, list_repo_files
 snapshot_download(HF_DATASET_REPO, repo_type="dataset", allow_patterns="labels/*",
                   local_dir=str(DATA))
 archivos = pd.read_parquet(DATA / "labels/actas_archivos.parquet")
@@ -108,29 +112,33 @@ random.Random(42).shuffle(ids)
 ids = ids[:N_ACTAS]
 n = len(ids); ntr = int(n * 0.70); nva = int(n * 0.15)
 splits = {"train": ids[:ntr], "val": ids[ntr:ntr + nva], "test": ids[ntr + nva:]}
-print({k: len(v) for k, v in splits.items()})'''),
-        md("## 3. Descarga + render + recorte + manifests (streaming por acta)\n\n"
-           "Por cada acta: descarga su PDF, renderiza, recorta los digitos y **borra el "
-           "PDF y el PNG**. Colab tiene poco disco/RAM; acumular los ~14GB de PDFs y los "
-           "~73GB de PNGs intermedios agota los recursos. Asi solo crecen los crops."),
+print({k: len(v) for k, v in splits.items()})
+
+pdf_dir = WORK / "pdfs"; pdf_dir.mkdir(exist_ok=True)
+snapshot_download(HF_DATASET_REPO, repo_type="dataset",
+                  allow_patterns=[f"{a}.pdf" for a in ids], local_dir=str(pdf_dir))
+print(f"{len(ids)} PDFs descargados")'''),
+        md("## 3. Render + recorte + manifests (streaming por acta)\n\n"
+           "Por cada acta: renderiza, recorta los digitos y **borra el PNG**. Acumular los "
+           "~73GB de PNGs intermedios agota el disco de Colab; asi solo crecen los crops "
+           "(~600MB). Los PDFs (~14GB) caben y se reusan para la demo."),
         code('''aid_to_idacta = dict(zip(archivos["archivoId"], archivos["idActa"]))
 # Restringir labels a las actas elegidas: acelera los joins por idActa del recorte.
 sel_idactas = {int(aid_to_idacta[a]) for a in ids if a in aid_to_idacta}
 votos    = votos[votos["idActa"].isin(sel_idactas)]
 cabecera = cabecera[cabecera["idActa"].isin(sel_idactas)]
-pdf_dir = WORK / "pdfs"; pdf_dir.mkdir(exist_ok=True)
 rendered = WORK / "rendered"; rendered.mkdir(exist_ok=True)
 for split, sids in splits.items():
     croot = DATA / f"crops_{split}"; saved = 0
     for i, aid in enumerate(sids):
-        pdf = Path(hf_hub_download(HF_DATASET_REPO, f"{aid}.pdf", repo_type="dataset",
-                                   local_dir=str(pdf_dir)))
+        pdf = pdf_dir / f"{aid}.pdf"
+        if not pdf.exists(): continue
         png = render_acta(pdf, rendered)
         ns, _ = build_crops_for_acta(png, aid, int(aid_to_idacta[aid]),
                                      TEMPLATE, votos, cabecera, croot)
         saved += ns
-        png.unlink(missing_ok=True); pdf.unlink(missing_ok=True)
-        if (i + 1) % 200 == 0: print(f"  {split}: {i + 1}/{len(sids)}")
+        png.unlink(missing_ok=True)   # no acumular los ~73GB de PNG
+        if (i + 1) % 500 == 0: print(f"  {split}: {i + 1}/{len(sids)}")
     n_rows = build_manifest(croot, DATA / f"manifest_{split}.csv")
     print(f"{split}: {saved} crops, manifest {n_rows} filas")'''),
         md("## 4. Demostracion: desde una acta hasta los digitos\n\n"
@@ -139,10 +147,8 @@ for split, sids in splits.items():
         code('''import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw
 
-demo_aid = ids[0]  # el streaming ya borro los PDFs; re-bajamos solo este
-demo_pdf = Path(hf_hub_download(HF_DATASET_REPO, f"{demo_aid}.pdf",
-                                repo_type="dataset", local_dir=str(pdf_dir)))
-demo_png = render_acta(demo_pdf, rendered)
+demo_aid = ids[0]
+demo_png = render_acta(pdf_dir / f"{demo_aid}.pdf", rendered)
 img = Image.open(demo_png).convert("RGB"); draw = ImageDraw.Draw(img); w, h = img.size
 for f in TEMPLATE["fields"]:
     x0, y0, x1, y1 = f["box"]
