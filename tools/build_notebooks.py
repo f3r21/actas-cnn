@@ -92,14 +92,18 @@ def build_preprocesamiento() -> nbf.NotebookNode:
         code(C.LABELS_BUILD),
         md("## 2. Descargar PDFs + labels de Hugging Face"),
         code('''import random
-from huggingface_hub import hf_hub_download, snapshot_download
+from huggingface_hub import hf_hub_download, snapshot_download, list_repo_files
 snapshot_download(HF_DATASET_REPO, repo_type="dataset", allow_patterns="labels/*",
                   local_dir=str(DATA))
 archivos = pd.read_parquet(DATA / "labels/actas_archivos.parquet")
 votos    = pd.read_parquet(DATA / "labels/actas_votos.parquet")
 cabecera = pd.read_parquet(DATA / "labels/actas_cabecera.parquet")
-pres = archivos[(archivos["tipo"] == 1) & (archivos["idEleccion"] == 10)]
-ids = pres["archivoId"].tolist()
+# Universo = PDFs realmente publicados en el dataset. El parquet actas tiene ~84k
+# presidenciales, pero solo se subieron las 5000 manuscritas; seleccionar del
+# parquet pediria PDFs inexistentes (404). list_repo_files da exactamente lo subido.
+con_label = set(archivos["archivoId"])
+ids = sorted(f[:-4] for f in list_repo_files(HF_DATASET_REPO, repo_type="dataset")
+             if f.endswith(".pdf") and f[:-4] in con_label)
 random.Random(42).shuffle(ids)
 ids = ids[:N_ACTAS]
 n = len(ids); ntr = int(n * 0.70); nva = int(n * 0.15)
