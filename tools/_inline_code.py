@@ -65,6 +65,21 @@ def localize_digits(image, template):
             for f in template["fields"]}'''
 
 # --- Labels (ground truth ONPE) + construccion de crops/manifest -------------
+# --- Compartido por 01 (armado de labels) y 02 (evaluacion downstream) --------
+FIELD_VALUE_FOR = r'''def field_value_for(name, votos_acta, total_emitidos):
+    """Entero del ground truth para un campo (partido / blanco-nulos-impugnados / total)."""
+    if name.startswith("partido_"):
+        pos = int(name.split("_")[1])
+        row = votos_acta[votos_acta["nposicion"] == pos]
+        return int(row.iloc[0]["nvotos"]) if len(row) else 0
+    mapping = {"votos_blanco": 80, "votos_nulos": 81, "votos_impugnados": 82}
+    if name in mapping:
+        row = votos_acta[votos_acta["nposicion"] == mapping[name]]
+        return int(row.iloc[0]["nvotos"]) if len(row) else 0
+    if name == "total_ciudadanos":
+        return int(total_emitidos)
+    raise ValueError(name)'''
+
 LABELS_BUILD = r'''# === Labels desde el ground truth ONPE + armado de crops/manifest ===
 import csv
 import pandas as pd
@@ -80,19 +95,7 @@ def int_to_digits(value, n_cells):
     """Entero -> lista de n_cells digitos right-justified. 18,3 -> [0,1,8]."""
     return [int(c) for c in str(int(value)).zfill(n_cells)]
 
-def field_value_for(name, votos_acta, total_emitidos):
-    """Entero del ground truth para un campo (partido / blanco-nulos-impugnados / total)."""
-    if name.startswith("partido_"):
-        pos = int(name.split("_")[1])
-        row = votos_acta[votos_acta["nposicion"] == pos]
-        return int(row.iloc[0]["nvotos"]) if len(row) else 0
-    mapping = {"votos_blanco": 80, "votos_nulos": 81, "votos_impugnados": 82}
-    if name in mapping:
-        row = votos_acta[votos_acta["nposicion"] == mapping[name]]
-        return int(row.iloc[0]["nvotos"]) if len(row) else 0
-    if name == "total_ciudadanos":
-        return int(total_emitidos)
-    raise ValueError(name)
+''' + FIELD_VALUE_FOR + r'''
 
 def build_crops_for_acta(image, archivo_id, id_acta, template,
                          votos, cabecera, crops_root, filtrar_vacias=True):
@@ -146,6 +149,7 @@ def resnet18_cifar(in_channels=1, num_classes=10):
 # --- Dataset + transforms ----------------------------------------------------
 DATASET = r'''# === Dataset de crops + transforms ===
 import torch
+from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 
@@ -237,6 +241,8 @@ def train_model(manifest, root, device, epochs=20, lr=5e-4, batch_size=128,
 # --- Evaluacion downstream (digit/field/acta-level + reconstruccion) ---------
 EVAL = r'''# === Evaluacion downstream: digit / field / acta-level + reconstruccion del total ===
 import numpy as np
+
+''' + FIELD_VALUE_FOR + r'''
 
 def parse_crop_path(rel):
     """'<label>/<aid>_<field>_c<pos>.png' -> (aid, field, pos)."""
