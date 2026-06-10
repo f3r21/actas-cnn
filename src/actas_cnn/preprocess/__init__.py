@@ -15,8 +15,12 @@ from .crops import (
     int_to_digits,
     load_templates,
     localize_digits,
+    patron_de_tinta,
+    remapeo_ink_aware,
     split_digits,
     tiene_tinta,
+    umbral_adaptativo,
+    ventana_central,
 )
 
 __all__ = [
@@ -26,6 +30,10 @@ __all__ = [
     "split_digits",
     "es_celda_escrita",
     "tiene_tinta",
+    "ventana_central",
+    "umbral_adaptativo",
+    "patron_de_tinta",
+    "remapeo_ink_aware",
     "int_to_digits",
     "field_value_for",
     "load_templates",

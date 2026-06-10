@@ -106,6 +106,150 @@ def tiene_tinta(digit_img, fraccion_minima=0.02, intensidad_max=180):
     return oscuros / arr.size > fraccion_minima
 
 
+# --- Deteccion de tinta por celda (etiquetado ink-aware) ----------------------
+#
+# Una minoria de actas (~3% en val) viola la convencion right-justified: el
+# escribiente llena las cifras desde la primera celda o centradas. Con el
+# etiquetado posicional esas actas quedan envenenadas (celdas vacias con label
+# de digito, digitos con el label del vecino) y concentran el 82% de los
+# errores de campo en eval. Estas funciones detectan DONDE cae la tinta para
+# remapear los labels en esas actas. Validadas en
+# experiments/justificacion/audit_justificacion.py (19/19 actas de la cola de
+# eval clasifican como violadoras; 0 por desalineacion geometrica).
+
+def ventana_central(cell_img, mx=0.25, my=0.15):
+    """Ventana central de la celda como array uint8. La tinta de un digito
+    escrito cae al centro; el sangrado de trazos del digito vecino y los
+    bordes punteados se concentran en los margenes, asi que se descartan."""
+    w, h = cell_img.size
+    box = (int(w * mx), int(h * my), int(w * (1 - mx)), int(h * (1 - my)))
+    return np.asarray(cell_img.crop(box).convert("L"), dtype=np.uint8)
+
+
+def umbral_adaptativo(arrays, delta=55):
+    """Umbral de oscuridad relativo al fondo del escaneo de ESTA acta.
+
+    Un umbral fijo falla en escaneos grisaceos (fondo ~170: todo cuenta como
+    tinta). La mediana de todos los pixeles de las celdas es fondo casi puro
+    (la tinta es minoria), asi que fondo - delta separa trazos del papel en
+    escaneos claros y oscuros por igual.
+    """
+    fondo = int(np.median(np.concatenate([a.ravel() for a in arrays])))
+    return int(np.clip(fondo - delta, 40, 200))
+
+
+def patron_de_tinta(fracs, piso=0.07, rel=0.55):
+    """Clasifica donde cae la tinta de un campo. Devuelve (patron, run, inked).
+
+    El corte por celda es relativo al maximo del campo (la fraccion absoluta
+    de un "1" delgado empata con el sangrado del vecino, pero dentro del campo
+    el digito escrito siempre domina).
+
+      RIGHT    run contiguo anclado a la ultima celda (convencion asumida;
+               incluye ceros a la izquierda escritos y digitos tenues)
+      LEFT     run anclado a la primera celda sin llegar a la ultima
+      MEDIO    run que no toca ningun extremo
+      OTRO     mas de un run (tinta salteada)
+      AMBIGUO  tinta demasiado tenue para decidir
+
+    run es (a, b) con celdas inked en [a, b), o None si no hay run unico.
+    """
+    fmax = max(fracs)
+    if fmax < piso:
+        return "AMBIGUO", None, tuple(False for _ in fracs)
+    corte = max(piso, rel * fmax)
+    inked = tuple(f >= corte for f in fracs)
+    runs = []
+    i = 0
+    while i < len(inked):
+        if inked[i]:
+            j = i
+            while j < len(inked) and inked[j]:
+                j += 1
+            runs.append((i, j))
+            i = j
+        else:
+            i += 1
+    if len(runs) != 1:
+        return "OTRO", None, inked
+    a, b = runs[0]
+    if b == len(inked):
+        return "RIGHT", (a, b), inked
+    if a == 0:
+        return "LEFT", (a, b), inked
+    return "MEDIO", (a, b), inked
+
+
+def remapeo_ink_aware(fields_cells, template, votos_acta, total_emitidos,
+                      min_informativos=4, umbral_viola=0.5, piso=0.07):
+    """Plan de remapeo de labels para una acta que viola la convencion.
+
+    Devuelve {} si la acta cumple la convencion right-justified (lo normal:
+    nada cambia). Si la mayoria de sus campos legibles esta corrida (LEFT o
+    MEDIO), devuelve {field_name: {pos: label}} SOLO para los campos donde el
+    remapeo es confiable: run de tinta del largo exacto del valor y celdas
+    esperadas por la convencion sin tinta (si la celda esperada tambien tiene
+    tinta, es un digito a caballo entre ventanas por offset del escaneo, no
+    una violacion: 1 acta de val escribe asi y evalua perfecto). Todo lo demas
+    conserva el etiquetado posicional de siempre: el fix solo toca lo que
+    puede arreglar con confianza, nunca empeora el statu quo.
+    """
+    centros = {name: [ventana_central(c) for c in cells]
+               for name, cells in fields_cells.items()}
+    intensidad = umbral_adaptativo([a for cs in centros.values() for a in cs])
+
+    analisis = {}
+    for field in template["fields"]:
+        name = field["name"]
+        value = field_value_for(name, votos_acta, total_emitidos)
+        if value <= 0:
+            continue
+        fracs = [float((a < intensidad).sum() / a.size) for a in centros[name]]
+        analisis[name] = (value, fracs, *patron_de_tinta(fracs))
+
+    conteo = {}
+    for _, _, patron, _, _ in analisis.values():
+        conteo[patron] = conteo.get(patron, 0) + 1
+    informativos = sum(conteo.get(p, 0) for p in ("RIGHT", "LEFT", "MEDIO", "OTRO"))
+    viola = conteo.get("LEFT", 0) + conteo.get("MEDIO", 0)
+    if informativos < min_informativos or viola / informativos < umbral_viola:
+        return {}
+
+    candidatos = []
+    for name, (value, fracs, patron, run, _) in analisis.items():
+        if patron not in ("LEFT", "MEDIO") or run is None:
+            continue
+        digitos = [int(c) for c in str(value)]
+        if run[1] - run[0] != len(digitos):
+            continue  # tinta no calza con el numero de digitos: no tocar
+        candidatos.append((name, run, digitos))
+    if not candidatos:
+        return {}
+
+    # Distinguir violacion real de offset del escaneo: si el digito quedo "a
+    # caballo" entre dos ventanas (acta corrida unos px), la celda que la
+    # convencion espera escrita TAMBIEN tiene tinta — medida a celda completa,
+    # porque pegada al borde la ventana central no la ve. En la violacion real
+    # esa celda esta vacia. Se decide por acta (mediana sobre los campos
+    # remapeables): el straddle es sistematico, el sangrado puntual no.
+    evidencias = []
+    for name, run, digitos in candidatos:
+        n_cells = len(analisis[name][1])
+        fuera = [p for p in range(n_cells - len(digitos), n_cells)
+                 if not run[0] <= p < run[1]]
+        if not fuera:
+            continue
+        fulls = [ventana_central(fields_cells[name][p], mx=0.05, my=0.05)
+                 for p in fuera]
+        evidencias.append(max(float((a < intensidad).sum() / a.size)
+                              for a in fulls))
+    if evidencias and float(np.median(evidencias)) >= piso:
+        return {}  # offset, no violacion: el etiquetado posicional ya es correcto
+
+    return {name: dict(zip(range(run[0], run[1]), digitos))
+            for name, run, digitos in candidatos}
+
+
 # --- Labels desde el ground truth ONPE ---------------------------------------
 
 N_PARTIDOS = 38
@@ -166,6 +310,7 @@ def build_crops_for_acta(
     crops_root: "str | Path",
     localizer=None,
     filtrar_vacias: bool = True,
+    ink_aware: bool = True,
 ) -> tuple[int, int]:
     """Procesa una acta y guarda sus crops. Devuelve (n_guardados, n_filtrados).
 
@@ -174,6 +319,10 @@ def build_crops_for_acta(
     los digitos; None usa el zonal `localize_digits` (oficial). Si filtrar_vacias=True las
     celdas sin digito escrito segun el label (es_celda_escrita) NO se guardan:
     resuelve el imbalance (76% de las celdas son vacias y dominarian el training).
+    Con ink_aware=True, las actas que violan la convencion right-justified
+    (escritura corrida a la izquierda o centrada, ~3% en val) se detectan por
+    tinta y sus labels se remapean a las celdas realmente escritas
+    (remapeo_ink_aware); en el resto de actas no cambia nada.
     """
     crops_root = Path(crops_root)
     votos_acta = votos[votos["idActa"] == id_acta]
@@ -189,19 +338,26 @@ def build_crops_for_acta(
 
     localizer = localizer or localize_digits
     fields_cells = localizer(image, template)
+    remap = (remapeo_ink_aware(fields_cells, template, votos_acta, total_emitidos)
+             if ink_aware else {})
 
     n_saved, n_filtered = 0, 0
     for field in template["fields"]:
         name = field["name"]
         n_cells = field["n_digits"]
         value = field_value_for(name, votos_acta, total_emitidos)
-        labels = int_to_digits(value, n_cells)
         digit_imgs = fields_cells[name]
-        for pos, (label, dimg) in enumerate(zip(labels, digit_imgs)):
-            if filtrar_vacias and not es_celda_escrita(value, n_cells, pos):
+        if name in remap:
+            etiqueta_en = remap[name]
+        else:
+            labels = int_to_digits(value, n_cells)
+            etiqueta_en = {pos: labels[pos] for pos in range(n_cells)
+                           if not filtrar_vacias or es_celda_escrita(value, n_cells, pos)}
+        for pos, dimg in enumerate(digit_imgs):
+            if pos not in etiqueta_en:
                 n_filtered += 1
                 continue
-            dest_dir = crops_root / str(label)
+            dest_dir = crops_root / str(etiqueta_en[pos])
             dest_dir.mkdir(parents=True, exist_ok=True)
             dimg.save(dest_dir / f"{archivo_id}_{name}_c{pos}.png")
             n_saved += 1

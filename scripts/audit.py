@@ -208,12 +208,21 @@ def check_5_labels_match_image() -> CheckResult:
         field = rest.rsplit("_c", 1)[0]
         pos = int(rest.rsplit("_c", 1)[1])
         try:
-            value, n_cells, expected = _expected_label(aid, field, pos, archivos, votos, cab, template)
+            value, n_cells, _ = _expected_label(aid, field, pos, archivos, votos, cab, template)
         except Exception as exc:
             rows.append((label, fpath.name, None, None, None, f"ERROR {exc}"))
             mismatches += 1
             continue
-        match = (label == expected)
+        # Validacion por campo, agnostica de la convencion: los labels de los
+        # crops del campo, leidos en orden de posicion, deben formar el valor.
+        # Vale igual para right-justified y para actas remapeadas ink-aware
+        # (escritura corrida), donde la posicion ya no es valor posicional.
+        hermanos = sorted(fpath.parent.parent.glob(f"*/{aid}_{field}_c*.png"),
+                          key=lambda p: int(p.stem.rsplit("_c", 1)[1]))
+        cadena = "".join(p.parent.name for p in hermanos)
+        match = (cadena == str(value))
+        idx = [p.name for p in hermanos].index(fpath.name)
+        expected = int(str(value)[idx]) if idx < len(str(value)) else None
         if not match:
             mismatches += 1
         rows.append((label, fpath.name, value, n_cells, expected, "match" if match else "MISMATCH"))
@@ -256,7 +265,7 @@ def check_5_labels_match_image() -> CheckResult:
     return CheckResult(
         n=5, title="Labels coinciden con imagen (30 crops random)",
         claim="Cada crop en data/crops_<split>/<label>/ tiene un digito que coincide con el label segun ground truth.",
-        method="30 crops random (3 por clase) -> parse archivoId/field/pos -> lookup nvotos -> int_to_digits -> compare con label de carpeta.",
+        method="30 crops random (3 por clase) -> parse archivoId/field -> lookup nvotos -> los labels del campo leidos en orden deben formar el valor (agnostico de la convencion; cubre remapeo ink-aware).",
         evidence=f"matches={30-mismatches}/30; visual en {VIS / 'audit_labels_30.png'}",
         result=result, notes=notes,
     )

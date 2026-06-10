@@ -117,9 +117,39 @@ de 3 celdas:
 - valor 0     -> `[vacio, vacio, vacio]` (nadie escribe "000")
 - valor 20    -> `[vacio, "2", "0"]` (el "0" trailing si se escribe)
 
-Esta convencion define la funcion `extract_crops.es_celda_escrita(value,
-n_cells, cell_position)` que filtra celdas vacias del training set sin
-tener que medir tinta en la imagen.
+Esta convencion define la funcion `es_celda_escrita(value, n_cells,
+cell_position)` (en `actas_cnn.preprocess.crops`) que filtra celdas
+vacias del training set sin tener que medir tinta en la imagen.
+
+### Excepcion: actas que violan la convencion (etiquetado ink-aware)
+
+Hallazgo del 2026-06-10 (`experiments/justificacion/`): **~3% de las
+actas viola la convencion** — el escribiente llena las cifras desde la
+primera celda (left-justified) o centradas. Con el etiquetado posicional
+puro esas actas quedaban envenenadas (celdas vacias con label de digito,
+digitos con el label del vecino) y concentraban el **82% de los errores
+de campo** en val (19 de las 19 actas de la cola con >=5 campos mal; 0
+eran desalineacion geometrica del escaneo).
+
+Desde entonces `build_crops_for_acta` usa **etiquetado ink-aware**
+(`ink_aware=True` por defecto): `remapeo_ink_aware` mide donde cae la
+tinta (ventana central de cada celda + umbral de oscuridad adaptativo al
+fondo del escaneo + corte relativo al maximo del campo) y, SOLO si la
+mayoria de los campos legibles del acta esta corrida, remapea los labels
+a las celdas realmente escritas. Guardas de seguridad:
+
+- Solo se remapean campos con run de tinta contiguo del largo exacto del
+  valor; lo demas conserva el etiquetado posicional (statu quo).
+- Si las celdas que la convencion espera escritas TAMBIEN tienen tinta
+  (medida a celda completa, mediana sobre el acta), es un digito "a
+  caballo" entre ventanas por offset del escaneo, no una violacion: no
+  se remapea nada (1 acta de val escribe asi y evalua perfecto).
+
+La evaluacion (`actas_cnn.evaluate.reconstruct_value`) reconstruye el
+entero **concatenando los digitos de las celdas presentes en orden**:
+equivalente exacto al esquema posicional para actas right-justified
+(verificado: reproduce 98.12/98.87/90.33 sobre los crops de mayo) y
+correcto para las remapeadas.
 
 ## Templates calibradas
 

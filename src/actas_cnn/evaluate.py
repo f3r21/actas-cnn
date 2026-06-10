@@ -60,12 +60,17 @@ def parse_crop_path(rel: str) -> tuple[str, str, int]:
     return aid, field, pos
 
 
-def reconstruct_value(preds_by_pos: dict[int, int], n_cells: int) -> int:
-    """Combina digitos predichos en entero right-justified. Posiciones sin
-    crop en el manifest se interpretan como leading zeros (0).
+def reconstruct_value(preds_by_pos: dict[int, int]) -> int:
+    """Concatena los digitos predichos de las celdas presentes, en orden.
+
+    Para crops right-justified es equivalente al esquema posicional anterior
+    (las posiciones sin crop eran leading zeros). Para crops ink-aware (actas
+    con escritura corrida, labels remapeados a las celdas con tinta) la
+    posicion deja de ser valor posicional: solo importa el orden de lectura.
     """
-    digits = [preds_by_pos.get(p, 0) for p in range(n_cells)]
-    return int("".join(str(d) for d in digits))
+    if not preds_by_pos:
+        return 0
+    return int("".join(str(preds_by_pos[p]) for p in sorted(preds_by_pos)))
 
 
 def real_value_for(name: str, votos_acta: pd.DataFrame, total_emitidos: int) -> int:
@@ -150,7 +155,7 @@ def main() -> None:
         for fname, n_cells in field_specs.items():
             crops_field = df_acta[df_acta["field"] == fname]
             preds_by_pos = dict(zip(crops_field["pos"], crops_field["pred"]))
-            pred_value = reconstruct_value(preds_by_pos, n_cells)
+            pred_value = reconstruct_value(preds_by_pos)
             real_value = real_value_for(fname, votos_acta, total_real)
             rows.append({
                 "archivoId": aid, "field": fname,
