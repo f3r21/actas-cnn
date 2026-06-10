@@ -218,23 +218,31 @@ for split, sids in splits.items():
            "Visualiza el resultado de la deteccion sobre una acta: los 42 campos "
            "localizados y, dentro de uno, las celdas de cada digito."),
         code('''import matplotlib.pyplot as plt
-from PIL import Image, ImageDraw
+from PIL import ImageDraw
 
-rendered = WORK / "rendered"; rendered.mkdir(exist_ok=True)
-demo_aid = ids[0]
-demo_png = render_acta(pdf_dir / f"{demo_aid}.pdf", rendered)
-img = Image.open(demo_png).convert("RGB"); draw = ImageDraw.Draw(img); w, h = img.size
+# Acta de demo: la primera (en el orden del shuffle) con el total escrito.
+# Ojo: ids[0] puede ser una acta totalmente en blanco (todos los votos en 0 y
+# total NaN en los labels de ONPE); el filtro es_celda_escrita las descarta
+# enteras (0 crops), asi que como demo no mostraria ningun digito.
+con_total = set(cabecera.loc[cabecera["totalVotosEmitidos"].notna(), "idActa"])
+demo_aid = next(a for a in ids if aid_to_idacta[a] in con_total)
+demo_total = int(cabecera.loc[cabecera["idActa"] == aid_to_idacta[demo_aid],
+                              "totalVotosEmitidos"].iloc[0])
+
+gris = rasterize_acta(pdf_dir / f"{demo_aid}.pdf")
+img = gris.convert("RGB"); draw = ImageDraw.Draw(img); w, h = img.size
 for f in TEMPLATE["fields"]:
     x0, y0, x1, y1 = f["box"]
     draw.rectangle([x0 * w, y0 * h, x1 * w, y1 * h], outline=(255, 0, 0), width=3)
 plt.figure(figsize=(7, 10)); plt.imshow(img); plt.axis("off")
 plt.title(f"42 campos detectados — acta {demo_aid[:10]}"); plt.show()
 
-celdas = localize_digits(demo_png, TEMPLATE)
-fig, axs = plt.subplots(1, 3, figsize=(6, 2))
-for ax, c in zip(axs, celdas["partido_01"]):
+celdas = localize_digits(gris, TEMPLATE)
+fig, axs = plt.subplots(1, 4, figsize=(8, 2))
+for ax, c in zip(axs, celdas["total_ciudadanos"]):
     ax.imshow(c, cmap="gray"); ax.axis("off")
-fig.suptitle("partido_01 -> 3 celdas (right-justified)"); plt.show()'''),
+fig.suptitle(f"total_ciudadanos = {demo_total} -> 4 celdas (right-justified)")
+plt.show()'''),
         md("## 5. Empaquetar y publicar el bundle de crops en HF\n\n"
            "El notebook del modelo (`02_modelo_colab.ipynb`) baja este "
            "`crops_bundle.tar.gz`."),

@@ -39,13 +39,6 @@ def rasterize_acta(pdf_path):
         pix = page.get_pixmap(matrix=mat)
     return Image.frombytes("RGB", (pix.width, pix.height), pix.samples).convert("L")
 
-def render_acta(pdf_path, out_dir):
-    """PDF de acta -> PNG portrait en disco (solo para QA visual / demo)."""
-    out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
-    out = out_dir / f"{Path(pdf_path).stem}_p0.png"
-    rasterize_acta(pdf_path).save(out)
-    return out
-
 def crop_fields(image, template):
     """Recorta los 42 campos por sus cajas relativas [x0,y0,x1,y1] en [0,1].
     Acepta una PIL.Image ya rasterizada o una ruta a PNG."""
