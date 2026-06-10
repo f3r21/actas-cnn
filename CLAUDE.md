@@ -97,8 +97,16 @@ que queda:
 1. **Decidir el modelo oficial**: `ls_ra_mu_cos` gana en todas las
    metricas; si se promueve, re-publicar el checkpoint en HF y
    actualizar README/CLAUDE.
-2. **Verificar `02_modelo_colab.ipynb` end-to-end** consumiendo el
-   `crops_bundle.tar.gz` publicado el 2026-06-09.
+2. **HECHO (2026-06-10)**: ambos notebooks verificados end-to-end en
+   Colab. `01` corrio completo (CPU, loop en memoria paralelo, mismos
+   conteos que el dataset local, 0 errores) y republico el
+   `crops_bundle.tar.gz` (mismo contenido byte a byte). `02` (T4)
+   consumio el bundle, entreno 20 epochs y evaluo: digit 97.60%, field
+   98.55%, acta-level 87.59%, reconstruccion exacta 91.05%, MAE 2.58.
+   Es una corrida fresca sin semilla fija: queda bajo el checkpoint
+   oficial (98.12% digit) por variacion normal corrida-a-corrida; las
+   metricas oficiales siguen siendo las de `resnet18_best.pt`. Los
+   outputs de la corrida quedaron registrados en el notebook del repo.
 3. Opcional: evaluar sobre el split `test` (todas las metricas
    reportadas son de val) y refrescar `AUDIT_REPORT.md` (es del 26-may).
 
