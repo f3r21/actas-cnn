@@ -1,7 +1,8 @@
 # 05 - Backlog priorizado
 
-Orden de trabajo. Estado actualizado al 2026-06-09 (comparativa de
-ablations cerrada; informe y slides descartados por decision del curso).
+Orden de trabajo. Estado actualizado al 2026-06-10 (etiquetado ink-aware;
+comparativa de ablations cerrada; informe y slides descartados por
+decision del curso).
 
 > **Nota (reorganizacion):** el codigo se movio al paquete `src/actas_cnn/`
 > (`model.py`→`actas_cnn.model`, `train.py`→`actas_cnn.training`,
@@ -19,6 +20,26 @@ ablations cerrada; informe y slides descartados por decision del curso).
 - [x] Filtrar STAE (Lima/Callao digital): solo manuscritas.
 - [x] Generar dataset: 5,000 manuscritas → 106k/22k/22k crops train/val/test.
 - [x] Pipeline reproducible (`scripts/run_week1_clean_pipeline.sh`).
+
+## P5 - Etiquetado ink-aware (2026-06-10)
+
+- [x] Diagnostico: la cola de errores son labels envenenados, no fallo
+      del modelo. Auditoria `experiments/justificacion/audit_justificacion.py`:
+      19/19 actas de la cola de val (>=5 campos mal) violan la convencion
+      right-justified; 0 son desalineacion geometrica del escaneo.
+- [x] Fix ink-aware en `actas_cnn.preprocess.crops` (`remapeo_ink_aware`)
+      + reconstruccion por concatenacion en `actas_cnn.evaluate`.
+      Equivalencia exacta verificada sobre los crops de mayo.
+- [x] Delta eval-side (mismo `resnet18_best.pt`): field 98.87 -> 99.45%,
+      330 -> 159 campos mal, 0 regresiones. Detalle en `docs/04`.
+- [x] Propagar a notebooks Colab (`tools/_inline_code.py`) + republicar
+      `crops_bundle.tar.gz` ink-aware en HF (2026-06-10).
+- [ ] **Modelo oficial ink-aware**: correr `02_modelo_colab.ipynb` en
+      Colab T4 sobre el bundle nuevo (decision: el oficial sale del
+      entregable reproducible, no de retrain local). Genera el checkpoint
+      y las metricas oficiales ink-aware.
+- [ ] Tras esa corrida: refrescar `AUDIT_REPORT.md` (hoy del 26-may;
+      CHECK 3/6 necesitan `data/pdfs_train/rendered/`, borrado el 06-01).
 
 ## P1 - ResNet-18 CIFAR y ablations (Semana 2)
 
@@ -80,9 +101,12 @@ ablations cerrada; informe y slides descartados por decision del curso).
 - [x] Subir mejor checkpoint a HF (`f3r21/actas-cnn-model`:
       `resnet18_best.pt`). W&B descartado.
 - [x] Publicar `crops_bundle.tar.gz` en HF (`01` lo publico el
-      2026-06-09; fixes de Colab sincronizados en `tools/`).
-- [ ] Verificar que `notebooks/02_modelo_colab.ipynb` corre end-to-end
-      en Colab consumiendo el bundle nuevo (unico pendiente de cierre).
+      2026-06-09; **republicado ink-aware el 2026-06-10**; fixes de
+      Colab sincronizados en `tools/`).
+- [x] Verificar que `notebooks/02_modelo_colab.ipynb` corre end-to-end
+      en Colab consumiendo el bundle (hecho 2026-06-10 con el bundle
+      right-justified; queda re-correrlo sobre el bundle ink-aware, ver
+      P5).
 
 ## Config a rellenar antes de Semana 4
 

@@ -17,7 +17,36 @@ electorales de las Elecciones Generales del Peru 2026.
   `docs/06-definicion-proyecto.md`.
 - Presentacion final: 18/06/2026.
 
-## Estado actual (2026-06-09, comparativa de ablations cerrada)
+## Estado actual (2026-06-10, etiquetado ink-aware)
+
+- **Hallazgo y fix de etiquetado (2026-06-10)**: ~3% de las actas viola
+  la convencion right-justified de ONPE (escribe las cifras corridas a
+  la izquierda o centradas). El etiquetado posicional las envenenaba y
+  **concentraban el 82% de los errores de campo** en val (19 de las 19
+  actas de la cola con >=5 campos mal; 0 eran desalineacion geometrica
+  del escaneo — auditado en `experiments/justificacion/`). El
+  preprocesamiento ahora es **ink-aware**: `remapeo_ink_aware`
+  (`src/actas_cnn/preprocess/crops.py`) detecta donde cae la tinta y
+  remapea labels solo en las actas corridas, con guard contra digitos a
+  caballo por offset; `evaluate.reconstruct_value` reconstruye por
+  concatenacion de celdas presentes (equivalencia exacta verificada
+  sobre los crops de mayo). **Delta del lado de evaluacion** (mismo
+  `resnet18_best.pt`, sin re-entrenar, sustituyendo las 20 actas
+  violadoras por crops ink-aware): field 98.87 -> **99.45%**, acta-level
+  90.33 -> **90.62%**, MAE total 2.40 -> **1.58**, 330 -> 159 campos mal
+  (-52%), **0 regresiones** en las otras 673 actas. El fix esta
+  propagado a los notebooks Colab y al `crops_bundle.tar.gz` republicado
+  en HF (2026-06-10).
+- **Modelo oficial ink-aware: PENDIENTE de Colab**. Decision del usuario
+  (2026-06-10): el modelo oficial ink-aware sale de correr
+  `02_modelo_colab.ipynb` en Colab T4 sobre el bundle nuevo (mismo
+  entorno reproducible del entregable), no de un retrain local. Hasta
+  esa corrida, las metricas oficiales publicadas siguen siendo las de
+  `resnet18_best.pt` (entrenado con labels right-justified, abajo). Los
+  crops locales canonicos `data/crops_<split>` ya son ink-aware; los de
+  mayo quedaron como respaldo `data/crops_<split>_mayo`.
+
+## Estado heredado (2026-06-09, comparativa de ablations cerrada)
 
 - **Pipeline operativo end-to-end**: PDF → PNG → field crops → digit
   crops con labels desde parquets → manifest CSV → CNN entrenada.
@@ -64,10 +93,12 @@ electorales de las Elecciones Generales del Peru 2026.
   mejorar el preprocesamiento (detector fiducial search-by-prior, std
   de roles TOP bajo 22-27x; projection profile en split_digits; filtro
   image-based con `tiene_tinta`). Tecnicamente correcto pero el
-  pipeline nuevo dio -0.72pp en acta-level vs el zonal viejo. El
-  techo del ~98% digit-level no esta en el preprocesamiento sino en
-  el modelo / labels / ambiguedad inherente. Pipeline zonal viejo es
-  el oficial. Backup del experimento conservado:
+  pipeline nuevo dio -0.72pp en acta-level vs el zonal viejo. El techo
+  no estaba en la *geometria* del preprocesamiento (alinear mejor no
+  ayudo) sino en los **labels**: el etiquetado posicional asumia la
+  convencion right-justified que ~3% de las actas viola (ver el hallazgo
+  ink-aware de 2026-06-10 al inicio). Pipeline zonal viejo es el
+  oficial. Backup del experimento conservado:
   `checkpoints/resnet18_best_new_pipeline.pt` (los `data/crops_*_v3/` y
   `data/manifest_*_v3.csv` se borraron en la limpieza de disco del 2026-06-01).
 - **Validacion auditada** (`AUDIT_REPORT.md`, via `scripts/audit.py`):
@@ -89,26 +120,30 @@ electorales de las Elecciones Generales del Peru 2026.
 
 ## Prioridad actual (cierre)
 
-El modelado y la evaluacion estan cerrados (tabla de ablations
-consolidada, matriz de confusion y per-class generadas). **No hay
-informe ni slides que entregar** (decision del 2026-06-09). Lo poco
+**No hay informe ni slides que entregar** (decision del 2026-06-09). Lo
 que queda:
 
-1. **Decidir el modelo oficial**: `ls_ra_mu_cos` gana en todas las
-   metricas; si se promueve, re-publicar el checkpoint en HF y
-   actualizar README/CLAUDE.
-2. **HECHO (2026-06-10)**: ambos notebooks verificados end-to-end en
-   Colab. `01` corrio completo (CPU, loop en memoria paralelo, mismos
-   conteos que el dataset local, 0 errores) y republico el
-   `crops_bundle.tar.gz` (mismo contenido byte a byte). `02` (T4)
-   consumio el bundle, entreno 20 epochs y evaluo: digit 97.60%, field
-   98.55%, acta-level 87.59%, reconstruccion exacta 91.05%, MAE 2.58.
-   Es una corrida fresca sin semilla fija: queda bajo el checkpoint
-   oficial (98.12% digit) por variacion normal corrida-a-corrida; las
-   metricas oficiales siguen siendo las de `resnet18_best.pt`. Los
-   outputs de la corrida quedaron registrados en el notebook del repo.
-3. Opcional: evaluar sobre el split `test` (todas las metricas
-   reportadas son de val) y refrescar `AUDIT_REPORT.md` (es del 26-may).
+1. **Modelo oficial ink-aware (PENDIENTE, en Colab)**: correr
+   `02_modelo_colab.ipynb` en Colab T4 sobre el `crops_bundle.tar.gz`
+   ink-aware republicado (2026-06-10). Esa corrida genera el checkpoint
+   y las metricas oficiales ink-aware (decision del usuario: el oficial
+   sale del entregable reproducible, no de un retrain local). Hasta
+   entonces, las metricas publicadas siguen siendo las de
+   `resnet18_best.pt` (labels right-justified). El delta ya medido del
+   lado de evaluacion: field 98.87 -> 99.45% (ver arriba y `docs/04`).
+2. **Decidir entre base e ink-aware como receta oficial**, y si promover
+   `ls_ra_mu_cos` (gana en las metricas right-justified): re-publicar
+   checkpoint en HF y actualizar README/CLAUDE. Idealmente re-correr las
+   ablations sobre el bundle ink-aware.
+3. Opcional: evaluar sobre el split `test` (todas las metricas son de
+   val) y refrescar `AUDIT_REPORT.md` (del 26-may; CHECK 3/6 necesitan
+   `data/pdfs_train/rendered/`, borrado el 06-01).
+
+> Nota: la verificacion end-to-end de ambos notebooks en Colab quedo
+> hecha el 2026-06-10 con el bundle right-justified (corrida fresca sin
+> semilla: digit 97.60%, acta 87.59%; bajo el checkpoint oficial por
+> variacion normal corrida-a-corrida). El item 1 la repite sobre el
+> bundle ink-aware.
 
 El backlog detallado esta en `docs/05-backlog.md`.
 
@@ -264,6 +299,14 @@ regenerables para liberar disco: `pdfs_train/rendered/` (73 GB de PNG),
 entrenamiento lee de `data/crops_*` (no de rendered/), asi que se entrena
 sin regenerar nada. Todo lo borrado es gitignored (`data/`, `checkpoints/`).
 
+> Nota (2026-06-10): `data/crops_<split>` locales ahora son **ink-aware**
+> (render de tamano fijo + remapeo de actas corridas). Los anteriores
+> right-justified (render de mayo) quedaron como respaldo
+> `data/crops_<split>_mayo` — necesarios para reproducir exactamente las
+> metricas de `resnet18_best.pt` (el checkpoint de mayo es sensible a la
+> geometria del render: con crops de geometria nueva su digit-level baja
+> ~2pp por mismatch, no por el etiquetado).
+
 **Respaldo remoto** (nuevo): los 5,000 PDFs fuente y `labels/` estan
 subidos al dataset HF publico `f3r21/actas-cnn-dataset` (PDFs en raiz,
 labels en `labels/`). Es la primera copia fuera del disco local;
@@ -273,4 +316,5 @@ descargable con `huggingface_hub` si se pierde el local.
 > viejo (crops + manifests + parquets). El bundle nuevo que consume el
 > entregable se llama `crops_bundle.tar.gz` y lo publica
 > `notebooks/01_preprocesamiento_colab.ipynb` (publicado en HF el
-> 2026-06-09; verificado en `f3r21/actas-cnn-dataset`).
+> 2026-06-09; **republicado ink-aware el 2026-06-10**; en
+> `f3r21/actas-cnn-dataset`).

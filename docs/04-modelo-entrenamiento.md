@@ -92,6 +92,41 @@ combinacion completa (`ls_ra_mu_cos`) domina en todas las metricas.
 `resnet18_best.pt` (base) sigue siendo el checkpoint publicado en HF;
 promover `ls_ra_mu_cos` es decision pendiente.
 
+## Etiquetado ink-aware (2026-06-10)
+
+La cola de errores no era ruido del modelo sino **labels envenenados**:
+~3% de las actas escribe las cifras corridas (no right-justified), y el
+etiquetado posicional asignaba el digito a la celda equivocada. En val,
+**19 de las 19 actas con >=5 campos mal** violan la convencion (0 son
+desalineacion geometrica); concentraban el 82% de los 330 errores de
+campo. Diagnostico en `experiments/justificacion/audit_justificacion.py`.
+
+Fix: etiquetado ink-aware (ver `docs/03-pipeline-datos.md`). Medido del
+lado de evaluacion con el **mismo `resnet18_best.pt`** (sin re-entrenar),
+para aislar el efecto del etiquetado:
+
+| Metrica | base (right-justified) | ink-aware (eval) | delta |
+|---|---|---|---|
+| Digit | 98.12% | 99.05% | +0.93pp |
+| Field | 98.87% | 99.45% | +0.58pp |
+| Acta-level | 90.33% (626/693) | 90.62% (628/693) | +0.29pp |
+| MAE total | 2.40 | 1.58 | -0.82 |
+| Campos mal | 330 | 159 | -52% |
+
+Solo se tocan las 20 actas violadoras (sustituidas por crops ink-aware);
+las otras 673 evaluan identico (**0 regresiones**). Confirmado tambien
+en A/B de misma geometria (crops nuevos con/sin ink-aware): field
++0.56pp, consistente — el efecto es el etiquetado, no el render.
+Acta-level sube poco porque los campos no remapeables (escritura muy
+apretada o tenue) siguen mal en esas mismas actas; el retrain sobre
+train limpio (Colab, pendiente) puede mejorarlo mas.
+
+**Procedencia del modelo oficial ink-aware**: pendiente de
+`02_modelo_colab.ipynb` en Colab T4 sobre el `crops_bundle.tar.gz`
+republicado (decision 2026-06-10: el oficial sale del entregable
+reproducible, no de un retrain local). Las metricas de arriba son
+eval-side; las del modelo re-entrenado saldran de esa corrida.
+
 ## Mejoras no exploradas (trabajo futuro)
 
 - Ablations: con/sin residual, profundidad (ResNet-18 vs ResNet-34).

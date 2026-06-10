@@ -22,6 +22,14 @@ Topicos en Inteligencia Artificial (CCOMP9-1).
 Modelo: **ResNet-18 estilo CIFAR** (He et al., 2015), 11.17M params,
 adaptada a entrada 32×32 px en escala de grises.
 
+> **Etiquetado ink-aware (2026-06-10):** ~3% de las actas escribe las
+> cifras sin respetar la convencion right-justified de ONPE, y
+> concentraban el 82% de los errores de campo. Corrigiendo el etiquetado
+> (ver [`docs/04`](docs/04-modelo-entrenamiento.md)) el field-level sube
+> a **99.45%** con el mismo modelo (eval-side, 0 regresiones). El
+> `crops_bundle.tar.gz` en HF ya es ink-aware; el checkpoint oficial
+> re-entrenado sobre el saldra de la proxima corrida de `02` en Colab.
+
 ### Ablations de regularizacion (val set)
 
 | Variante | Config | Digit | Field | Acta | Recon. exacta | MAE |
