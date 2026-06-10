@@ -104,7 +104,9 @@ def build_preprocesamiento() -> nbf.NotebookNode:
            "**Como correr:** runtime **CPU normal** (NO actives GPU: este notebook no la "
            "usa y Colab desconecta runtimes con GPU ociosa a mitad del procesamiento). "
            "Pon el `HF_TOKEN` (permiso de escritura) en el panel de secretos de Colab "
-           "**antes** de correr: la subida final lo necesita. Luego Run all. Si la "
+           "**antes** de correr: la subida final lo necesita y la celda de config frena "
+           "si falta (se configura una sola vez por cuenta; nunca pegues el token en una "
+           "celda: el repo es publico y HF lo revocaria). Luego Run all. Si la "
            "sesion se corta pero la VM sigue viva, re-correr todo continua donde quedo; "
            "si Colab recicla la VM, `/content` se pierde y la corrida empieza de cero."),
         md("## 0. Setup"),
@@ -117,10 +119,12 @@ REHACER_DESDE_CERO = False
 if SUBIR_A_HF:
     from huggingface_hub import get_token
     if get_token() is None:
-        # Avisar AHORA y no tras horas de procesamiento, cuando fallaria la subida.
-        print("AVISO: no hay HF_TOKEN (panel de secretos de Colab, icono de la llave; "
-              "dale acceso a este notebook). Configuralo antes de la celda final "
-              "o pon SUBIR_A_HF=False.")''', con_gpu=False)),
+        # Frenar AHORA y no tras ~40 min de procesamiento, cuando fallaria la subida.
+        raise RuntimeError(
+            "No hay HF_TOKEN y SUBIR_A_HF=True: la subida final fallaria al terminar. "
+            "Agrega HF_TOKEN en el panel de secretos de Colab (icono de la llave; "
+            "permiso de escritura; dale acceso a este notebook) y re-corre esta "
+            "celda, o pon SUBIR_A_HF=False. Se configura UNA sola vez por cuenta.")''', con_gpu=False)),
         code(CELL_TEMPLATE),
         md("## 1. PREPROCESAMIENTO — deteccion de digitos (editar aqui)"),
         code(C.PREPROCESS),
