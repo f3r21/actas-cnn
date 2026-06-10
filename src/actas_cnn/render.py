@@ -16,9 +16,31 @@ from pathlib import Path
 from typing import Iterable
 
 import fitz  # PyMuPDF
+from PIL import Image
 
 
 TARGET_W, TARGET_H = 2339, 3309
+
+
+def rasterize_first_page(
+    pdf_path: "str | Path",
+    target_size: tuple[int, int] = (TARGET_W, TARGET_H),
+) -> Image.Image:
+    """Primera pagina del PDF -> PIL.Image en gris, en memoria (sin PNG).
+
+    Mismo raster que pdf_to_images (pixeles identicos, verificado byte a byte);
+    evita el encode/decode del PNG intermedio, que es ~3/4 del tiempo por acta
+    (medido en M2: 0.75s de 0.97s). Auto-rota landscape -> portrait igual que
+    el render a disco.
+    """
+    tw, th = target_size
+    with fitz.open(pdf_path) as doc:
+        page = doc[0]
+        if page.rect.width > page.rect.height:
+            page.set_rotation(90)
+        pix = page.get_pixmap(matrix=fitz.Matrix(tw / page.rect.width,
+                                                 th / page.rect.height))
+    return Image.frombytes("RGB", (pix.width, pix.height), pix.samples).convert("L")
 
 
 def _parse_size(s: str) -> tuple[int, int]:

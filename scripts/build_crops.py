@@ -72,7 +72,7 @@ def main() -> None:
     for _, row in to_proc.iterrows():
         aid = row["archivoId"]
         n_saved, n_filt = build_crops_for_acta(
-            png_path=pngs[aid],
+            image=pngs[aid],
             archivo_id=aid,
             id_acta=int(row["idActa"]),
             template=template,

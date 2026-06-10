@@ -26,13 +26,15 @@ def load_templates(path="templates.json"):
         return json.load(f)
 
 
-def crop_fields(image_path, template):
+def crop_fields(image, template):
     """Recorta los campos numericos definidos en la plantilla.
 
     template["fields"]: lista de {name, box:[x0,y0,x1,y1], n_digits} con box en
-    fraccion [0, 1]. Devuelve un dict name -> PIL.Image (escala de grises).
+    fraccion [0, 1]. `image` puede ser una ruta a PNG o una PIL.Image ya
+    rasterizada en memoria (render.rasterize_first_page). Devuelve un dict
+    name -> PIL.Image (escala de grises).
     """
-    img = Image.open(image_path).convert("L")
+    img = image if isinstance(image, Image.Image) else Image.open(image).convert("L")
     w, h = img.size
     crops = {}
     for field in template["fields"]:
@@ -57,7 +59,7 @@ def split_digits(field_img, n_digits):
             for i in range(n_digits)]
 
 
-def localize_digits(image_path, template):
+def localize_digits(image, template):
     """Localiza las celdas de digitos de cada campo: {campo: [celda_0, ...]}.
 
     Metodo OFICIAL (zonal): recorta cada campo por su caja de la plantilla y lo
@@ -66,7 +68,7 @@ def localize_digits(image_path, template):
     con la misma firma a build_crops_for_acta). El localizador fiducial
     alternativo (experimento negativo) vive en experiments/fiducial/.
     """
-    fields = crop_fields(image_path, template)
+    fields = crop_fields(image, template)
     return {f["name"]: split_digits(fields[f["name"]], f["n_digits"])
             for f in template["fields"]}
 
@@ -155,7 +157,7 @@ def field_value_for(name: str, votos_acta: "pd.DataFrame", total_emitidos: int) 
 # --- Orquestador: PNG + labels -> crops en disco -----------------------------
 
 def build_crops_for_acta(
-    png_path: "str | Path",
+    image: "str | Path | Image.Image",
     archivo_id: str,
     id_acta: int,
     template: dict,
@@ -167,7 +169,8 @@ def build_crops_for_acta(
 ) -> tuple[int, int]:
     """Procesa una acta y guarda sus crops. Devuelve (n_guardados, n_filtrados).
 
-    `localizer` (callable png,template -> {campo:[celdas]}) decide donde estan
+    `image`: ruta a PNG o PIL.Image en memoria (render.rasterize_first_page).
+    `localizer` (callable imagen,template -> {campo:[celdas]}) decide donde estan
     los digitos; None usa el zonal `localize_digits` (oficial). Si filtrar_vacias=True las
     celdas sin digito escrito segun el label (es_celda_escrita) NO se guardan:
     resuelve el imbalance (76% de las celdas son vacias y dominarian el training).
@@ -185,7 +188,7 @@ def build_crops_for_acta(
     total_emitidos = int(total_raw)
 
     localizer = localizer or localize_digits
-    fields_cells = localizer(png_path, template)
+    fields_cells = localizer(image, template)
 
     n_saved, n_filtered = 0, 0
     for field in template["fields"]:

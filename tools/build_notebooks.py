@@ -38,6 +38,17 @@ def code(src: str):
     return nbf.v4.new_code_cell(src)
 
 
+def badge(notebook_name: str):
+    """Celda-badge 'Open in Colab', identica a la que inserta Colab al guardar
+    en GitHub: generarla aqui evita que cada save de Colab la re-agregue (churn)."""
+    cell = md(f'<a href="https://colab.research.google.com/github/f3r21/actas-cnn/'
+              f'blob/main/notebooks/{notebook_name}" target="_parent">'
+              f'<img src="https://colab.research.google.com/assets/colab-badge.svg" '
+              f'alt="Open In Colab"/></a>')
+    cell.metadata = {"id": "view-in-github", "colab_type": "text"}
+    return cell
+
+
 # --- celdas con inyeccion (template + config) --------------------------------
 
 CELL_TEMPLATE = ("# Plantilla Presidencial: 42 campos (38 partidos + blanco/nulos/"
@@ -47,12 +58,9 @@ CELL_TEMPLATE = ("# Plantilla Presidencial: 42 campos (38 partidos + blanco/nulo
                  .replace("\n", " "))
 
 
-def config_cell(modo_block: str) -> str:
-    return f'''# === Config + entorno ===
-import os, tarfile
-from pathlib import Path
-import pandas as pd
-import torch
+def config_cell(modo_block: str, con_gpu: bool = True) -> str:
+    if con_gpu:
+        device_block = '''import torch
 
 def torch_device():
     if torch.cuda.is_available(): return torch.device("cuda")
@@ -61,7 +69,16 @@ def torch_device():
 DEVICE = torch_device(); print("device:", DEVICE)
 if DEVICE.type != "cuda":
     print("AVISO: sin GPU CUDA. En Colab: Runtime -> Change runtime type -> T4 GPU. "
-          "Sin GPU el entrenamiento es MUY lento.")
+          "Sin GPU el entrenamiento es MUY lento.")'''
+    else:
+        device_block = '''# Este notebook es CPU-only (PyMuPDF/PIL/pandas, la GPU jamas se usa).
+# NO pidas runtime GPU: Colab desconecta runtimes con GPU ociosa a mitad de la
+# celda larga de render ("Runtime disconnected"). Usa el runtime CPU normal.'''
+    return f'''# === Config + entorno ===
+import os, tarfile
+from pathlib import Path
+import pandas as pd
+{device_block}
 
 HF_DATASET_REPO = "{HF_DATASET_REPO}"   # PDFs + labels (+ crops_bundle si 01 ya corrio)
 
@@ -74,18 +91,36 @@ DATA = WORK / "data"; DATA.mkdir(parents=True, exist_ok=True)
 
 def build_preprocesamiento() -> nbf.NotebookNode:
     cells = [
+        badge("01_preprocesamiento_colab.ipynb"),
         md("# actas-cnn — Preprocesamiento (Colab)\n\n"
            "**Que hace:** baja las actas (PDFs) + labels de Hugging Face, las renderiza, "
            "detecta los digitos, recorta y etiqueta, arma los manifests y **publica el "
            "bundle de crops en HF** para que el notebook entregable lo consuma.\n\n"
-           "**Esta es la superficie que mas se itera:** para cambiar *como se detectan los "
-           "digitos*, edita la celda marcada `PREPROCESAMIENTO` y vuelve a correr todo.\n\n"
-           "Requiere un `HF_TOKEN` con permiso de escritura (panel de secretos de Colab) "
-           "para la subida final."),
+           "**Esta es la superficie que mas se itera:** para cambiar *como se detectan "
+           "los digitos*, edita la celda marcada `PREPROCESAMIENTO`, pon "
+           "`REHACER_DESDE_CERO = True` en la config y vuelve a correr todo (sin el "
+           "flag, las actas ya procesadas se saltan y publicarias crops del metodo "
+           "viejo).\n\n"
+           "**Como correr:** runtime **CPU normal** (NO actives GPU: este notebook no la "
+           "usa y Colab desconecta runtimes con GPU ociosa a mitad del procesamiento). "
+           "Pon el `HF_TOKEN` (permiso de escritura) en el panel de secretos de Colab "
+           "**antes** de correr: la subida final lo necesita. Luego Run all. Si la "
+           "sesion se corta pero la VM sigue viva, re-correr todo continua donde quedo; "
+           "si Colab recicla la VM, `/content` se pierde y la corrida empieza de cero."),
         md("## 0. Setup"),
         code(C.INSTALL),
-        code(config_cell('N_ACTAS = 5000   # cuantas actas preprocesar\n'
-                         'SUBIR_A_HF = True  # publica crops_bundle.tar.gz en HF (requiere HF_TOKEN)')),
+        code(config_cell('''N_ACTAS = 5000   # cuantas actas preprocesar
+SUBIR_A_HF = True  # publica crops_bundle.tar.gz en HF (requiere HF_TOKEN)
+# True si editaste la deteccion de digitos: borra crops y progreso y reprocesa
+# todo. Sin esto, re-correr salta las actas ya hechas (publicarias crops viejos).
+REHACER_DESDE_CERO = False
+if SUBIR_A_HF:
+    from huggingface_hub import get_token
+    if get_token() is None:
+        # Avisar AHORA y no tras horas de procesamiento, cuando fallaria la subida.
+        print("AVISO: no hay HF_TOKEN (panel de secretos de Colab, icono de la llave; "
+              "dale acceso a este notebook). Configuralo antes de la celda final "
+              "o pon SUBIR_A_HF=False.")''', con_gpu=False)),
         code(CELL_TEMPLATE),
         md("## 1. PREPROCESAMIENTO — deteccion de digitos (editar aqui)"),
         code(C.PREPROCESS),
@@ -118,35 +153,74 @@ pdf_dir = WORK / "pdfs"; pdf_dir.mkdir(exist_ok=True)
 snapshot_download(HF_DATASET_REPO, repo_type="dataset",
                   allow_patterns=[f"{a}.pdf" for a in ids], local_dir=str(pdf_dir))
 print(f"{len(ids)} PDFs descargados")'''),
-        md("## 3. Render + recorte + manifests (streaming por acta)\n\n"
-           "Por cada acta: renderiza, recorta los digitos y **borra el PNG**. Acumular los "
-           "~73GB de PNGs intermedios agota el disco de Colab; asi solo crecen los crops "
-           "(~600MB). Los PDFs (~14GB) caben y se reusan para la demo."),
-        code('''aid_to_idacta = dict(zip(archivos["archivoId"], archivos["idActa"]))
+        md("## 3. Render + recorte + manifests (en memoria, paralelo, reanudable)\n\n"
+           "Por cada acta: rasteriza el PDF **directo a imagen en memoria** (el PNG "
+           "intermedio costaba ~3/4 del tiempo por acta en encode/decode — medido "
+           "0.75s de 0.97s en M2 — y se borraba un segundo despues; los pixeles son "
+           "identicos) y guarda solo los crops (~600MB). Corre en paralelo con todos "
+           "los nucleos y es **reanudable dentro de la misma VM**: las actas ya "
+           "procesadas (`data/procesadas_<split>.txt`) se saltan al re-correr la celda "
+           "(si Colab recicla la VM, `/content` se pierde y se empieza de cero). Si "
+           "editaste la deteccion de digitos, pon `REHACER_DESDE_CERO = True` en la "
+           "config para no reusar crops del metodo viejo."),
+        code('''import shutil
+from functools import partial
+from multiprocessing import get_context
+from tqdm.auto import tqdm
+
+if REHACER_DESDE_CERO:
+    for split in splits:
+        shutil.rmtree(DATA / f"crops_{split}", ignore_errors=True)
+        (DATA / f"procesadas_{split}.txt").unlink(missing_ok=True)
+    print("REHACER_DESDE_CERO: crops y progreso borrados, se reprocesa todo")
+
+aid_to_idacta = dict(zip(archivos["archivoId"], archivos["idActa"]))
 # Restringir labels a las actas elegidas: acelera los joins por idActa del recorte.
 sel_idactas = {int(aid_to_idacta[a]) for a in ids if a in aid_to_idacta}
 votos    = votos[votos["idActa"].isin(sel_idactas)]
 cabecera = cabecera[cabecera["idActa"].isin(sel_idactas)]
-rendered = WORK / "rendered"; rendered.mkdir(exist_ok=True)
-for split, sids in splits.items():
-    croot = DATA / f"crops_{split}"; saved = 0
-    for i, aid in enumerate(sids):
+
+def procesa_acta(aid, croot):
+    """Una acta end-to-end: rasteriza en memoria, recorta y guarda sus crops."""
+    try:
         pdf = pdf_dir / f"{aid}.pdf"
-        if not pdf.exists(): continue
-        png = render_acta(pdf, rendered)
-        ns, _ = build_crops_for_acta(png, aid, int(aid_to_idacta[aid]),
+        if not pdf.exists():
+            return aid, 0, "pdf no descargado"
+        img = rasterize_acta(pdf)
+        ns, _ = build_crops_for_acta(img, aid, int(aid_to_idacta[aid]),
                                      TEMPLATE, votos, cabecera, croot)
-        saved += ns
-        png.unlink(missing_ok=True)   # no acumular los ~73GB de PNG
-        if (i + 1) % 500 == 0: print(f"  {split}: {i + 1}/{len(sids)}")
+        return aid, ns, None
+    except Exception as e:  # un PDF malo no debe tumbar la corrida entera
+        return aid, 0, repr(e)
+
+NPROC = os.cpu_count() or 2
+for split, sids in splits.items():
+    croot = DATA / f"crops_{split}"
+    done_file = DATA / f"procesadas_{split}.txt"
+    hechas = set(done_file.read_text().split()) if done_file.exists() else set()
+    pend = [a for a in sids if a not in hechas]
+    saved, errores = 0, []
+    if pend:
+        with get_context("fork").Pool(NPROC) as pool, open(done_file, "a") as marca:
+            tareas = pool.imap_unordered(partial(procesa_acta, croot=croot), pend)
+            for aid, ns, err in tqdm(tareas, total=len(pend), desc=split):
+                saved += ns
+                if err:
+                    errores.append((aid, err))
+                else:
+                    marca.write(aid + "\\n"); marca.flush()
     n_rows = build_manifest(croot, DATA / f"manifest_{split}.csv")
-    print(f"{split}: {saved} crops, manifest {n_rows} filas")'''),
+    print(f"{split}: +{saved} crops ({len(hechas)} actas ya estaban hechas), "
+          f"manifest {n_rows} filas, {len(errores)} errores")
+    for aid, err in errores[:5]:
+        print(f"  ERROR {aid}: {err}")'''),
         md("## 4. Demostracion: desde una acta hasta los digitos\n\n"
            "Visualiza el resultado de la deteccion sobre una acta: los 42 campos "
            "localizados y, dentro de uno, las celdas de cada digito."),
         code('''import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw
 
+rendered = WORK / "rendered"; rendered.mkdir(exist_ok=True)
 demo_aid = ids[0]
 demo_png = render_acta(pdf_dir / f"{demo_aid}.pdf", rendered)
 img = Image.open(demo_png).convert("RGB"); draw = ImageDraw.Draw(img); w, h = img.size
@@ -173,7 +247,7 @@ print("bundle:", bundle, round(bundle.stat().st_size / 1e6, 1), "MB")
 
 if SUBIR_A_HF:
     from huggingface_hub import HfApi
-    api = HfApi(token=os.environ.get("HF_TOKEN"))
+    api = HfApi()  # token: HF_TOKEN del entorno o del panel de secretos de Colab
     api.upload_file(path_or_fileobj=str(bundle), path_in_repo="crops_bundle.tar.gz",
                     repo_id=HF_DATASET_REPO, repo_type="dataset")
     print("subido a", HF_DATASET_REPO)
@@ -182,7 +256,7 @@ else:
         md("---\nListo. Con el bundle publicado, abre **`02_modelo_colab.ipynb`** "
            "para entrenar y obtener las metricas finales."),
     ]
-    return _nb(cells)
+    return _nb(cells, gpu=False)
 
 
 # === Notebook 02: modelo ====================================================
@@ -191,6 +265,7 @@ def build_modelo() -> nbf.NotebookNode:
     config = '''# Epochs de entrenamiento (~5-8 min en T4 con 20).
 EPOCHS = 20'''
     cells = [
+        badge("02_modelo_colab.ipynb"),
         md("# actas-cnn — Modelo + evaluacion (Colab)\n\n"
            "CNN que reconoce las cifras manuscritas de conteo de votos en actas "
            "electorales (ONPE, Elecciones Generales del Peru 2026). Parte de los **crops "
@@ -262,18 +337,22 @@ else:
     return _nb(cells)
 
 
-def _nb(cells) -> nbf.NotebookNode:
+def _nb(cells, gpu: bool = True) -> nbf.NotebookNode:
     nb = nbf.v4.new_notebook()
     # IDs deterministas por indice: regenerar no produce churn de git.
     for i, c in enumerate(cells):
         c.id = f"c{i:02d}"
     nb.cells = cells
     nb.metadata = {
-        "accelerator": "GPU",
         "colab": {"provenance": []},
         "kernelspec": {"name": "python3", "display_name": "Python 3"},
         "language_info": {"name": "python"},
     }
+    # Solo el notebook del modelo pide GPU. El de preprocesamiento es CPU-only:
+    # pedir GPU hace que Colab desconecte el runtime por GPU ociosa a mitad
+    # del render de 5000 actas.
+    if gpu:
+        nb.metadata["accelerator"] = "GPU"
     return nb
 
 

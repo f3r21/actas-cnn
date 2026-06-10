@@ -45,8 +45,14 @@ El entregable son **dos notebooks de Colab** que separan el preprocesamiento
 
 - **[`notebooks/01_preprocesamiento_colab.ipynb`](notebooks/01_preprocesamiento_colab.ipynb)** —
   preprocesa las 5,000 actas (render → deteccion de digitos → crops → manifests)
-  y **publica el bundle de crops en HF**. Es la superficie que mas se itera:
-  para cambiar *como se detectan los digitos* se edita aca y se re-publica; el
+  y **publica el bundle de crops en HF**. Correr en **runtime CPU** (no usa la
+  GPU, y Colab desconecta runtimes con GPU ociosa). El loop rasteriza en memoria
+  (sin PNG intermedio), corre en paralelo y es reanudable dentro de la misma VM:
+  si la sesion se corta, re-correr continua donde quedo (si Colab recicla la VM
+  se empieza de cero). Es la superficie que mas se itera: para cambiar *como se
+  detectan los digitos* se edita la celda `PREPROCESAMIENTO`, se pone
+  `REHACER_DESDE_CERO = True` y se re-publica (sin el flag, la reanudacion
+  saltaria las actas ya hechas y publicaria crops del metodo viejo); el
   notebook del modelo consume la ultima version.
 
 - **[`notebooks/02_modelo_colab.ipynb`](notebooks/02_modelo_colab.ipynb)** —

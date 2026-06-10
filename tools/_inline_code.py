@@ -23,24 +23,33 @@ PREPROCESS = r'''# === PREPROCESAMIENTO: deteccion de digitos (EDITAR AQUI para 
 import fitz  # PyMuPDF
 from PIL import Image
 
-TARGET_SIZE = (2339, 3309)  # tamano fijo: PNGs uniformes, detector estable
+TARGET_SIZE = (2339, 3309)  # tamano fijo: imagenes uniformes, detector estable
 
-def render_acta(pdf_path, out_dir):
-    """PDF de acta -> PNG portrait de tamano fijo (primera pagina)."""
-    out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+def rasterize_acta(pdf_path):
+    """PDF de acta -> PIL.Image en gris (primera pagina, tamano fijo), en memoria.
+    Sin PNG intermedio: encode+write+decode de un PNG de 7.7Mpx cuesta ~3/4 del
+    tiempo por acta (medido en M2: 0.75s de 0.97s) y el archivo se borraria
+    igual. Pixeles identicos al PNG (verificado byte a byte)."""
     with fitz.open(pdf_path) as doc:
         page = doc[0]
         if page.rect.width > page.rect.height:
             page.set_rotation(90)  # normaliza landscape -> portrait
         mat = fitz.Matrix(TARGET_SIZE[0] / page.rect.width,
                           TARGET_SIZE[1] / page.rect.height)
-        out = out_dir / f"{Path(pdf_path).stem}_p0.png"
-        page.get_pixmap(matrix=mat).save(out)
+        pix = page.get_pixmap(matrix=mat)
+    return Image.frombytes("RGB", (pix.width, pix.height), pix.samples).convert("L")
+
+def render_acta(pdf_path, out_dir):
+    """PDF de acta -> PNG portrait en disco (solo para QA visual / demo)."""
+    out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"{Path(pdf_path).stem}_p0.png"
+    rasterize_acta(pdf_path).save(out)
     return out
 
-def crop_fields(image_path, template):
-    """Recorta los 42 campos por sus cajas relativas [x0,y0,x1,y1] en [0,1]."""
-    img = Image.open(image_path).convert("L")
+def crop_fields(image, template):
+    """Recorta los 42 campos por sus cajas relativas [x0,y0,x1,y1] en [0,1].
+    Acepta una PIL.Image ya rasterizada o una ruta a PNG."""
+    img = image if isinstance(image, Image.Image) else Image.open(image).convert("L")
     w, h = img.size
     out = {}
     for field in template["fields"]:
@@ -56,9 +65,9 @@ def split_digits(field_img, n_digits):
     return [field_img.crop((int(i * step), 0, int((i + 1) * step), h))
             for i in range(n_digits)]
 
-def localize_digits(image_path, template):
+def localize_digits(image, template):
     """Localizador zonal: {campo: [celda_0, ...]}. Punto unico de 'donde estan'."""
-    fields = crop_fields(image_path, template)
+    fields = crop_fields(image, template)
     return {f["name"]: split_digits(fields[f["name"]], f["n_digits"])
             for f in template["fields"]}'''
 
@@ -92,15 +101,16 @@ def field_value_for(name, votos_acta, total_emitidos):
         return int(total_emitidos)
     raise ValueError(name)
 
-def build_crops_for_acta(png_path, archivo_id, id_acta, template,
+def build_crops_for_acta(image, archivo_id, id_acta, template,
                          votos, cabecera, crops_root, filtrar_vacias=True):
-    """PNG + labels -> crops/<label>/<archivoId>_<campo>_c<pos>.png. Devuelve (guardados, filtrados)."""
+    """Imagen (PIL o ruta) + labels -> crops/<label>/<archivoId>_<campo>_c<pos>.png.
+    Devuelve (guardados, filtrados)."""
     cab = cabecera[cabecera["idActa"] == id_acta]
     if len(cab) == 0 or pd.isna(cab.iloc[0]["totalVotosEmitidos"]):
         return 0, 0
     total = int(cab.iloc[0]["totalVotosEmitidos"])
     votos_acta = votos[votos["idActa"] == id_acta]
-    cells = localize_digits(png_path, template)
+    cells = localize_digits(image, template)
     crops_root = Path(crops_root)
     n_saved = n_filt = 0
     for field in template["fields"]:

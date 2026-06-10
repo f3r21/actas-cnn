@@ -123,10 +123,18 @@ El backlog detallado esta en `docs/05-backlog.md`.
 **El entregable son dos notebooks de Colab** que separan el preprocesamiento del
 modelo, comunicados por el bundle de crops en HF:
 `notebooks/01_preprocesamiento_colab.ipynb` (actas PDFs -> crops -> publica
-bundle en HF; superficie que mas se itera) y
+bundle en HF; superficie que mas se itera; **runtime CPU, nunca GPU**: no la
+usa, y la combinacion de GPU ociosa + corrida secuencial de horas es la causa
+probable del "Runtime disconnected" que mataba la corrida a mitad del render) y
 `notebooks/02_modelo_colab.ipynb` (baja los crops -> entrena -> evalua ->
-metricas). Ambos autonomos (codigo inline, no clonan el repo). El resto del repo
-es el "laboratorio" que los respalda. Tres capas:
+metricas; runtime T4). Ambos autonomos (codigo inline, no clonan el repo).
+Desde 2026-06-09 el loop de render+recorte de 01 es en memoria (sin PNG
+intermedio; pixeles identicos, verificado byte a byte sobre 469 crops),
+paralelo (multiprocessing fork) y reanudable dentro de la misma VM
+(`data/procesadas_<split>.txt`; si Colab recicla la VM se empieza de cero).
+Para iterar la deteccion de digitos hay que poner `REHACER_DESDE_CERO=True`
+(si no, el skip de reanudacion publicaria crops del metodo viejo).
+El resto del repo es el "laboratorio" que los respalda. Tres capas:
 
 1. **`src/actas_cnn/`** — paquete, fuente de verdad del pipeline. Los notebooks
    inline-an su logica (DRY via `tools/build_notebooks.py`); `scripts/` son
@@ -141,7 +149,10 @@ es el "laboratorio" que los respalda. Tres capas:
 
 ```
 actas_cnn.render            PDFs -> PNGs (PyMuPDF, tamano fijo 2339x3309, auto-rota landscape)
-actas_cnn.preprocess        PNGs + plantilla -> crops/<label>/*.png  *** deteccion de digitos (enchufable) ***
+                            rasterize_first_page: mismo raster directo a PIL en memoria
+                            (pixeles identicos; evita el PNG intermedio, ~3/4 del tiempo
+                            por acta medido en M2)
+actas_cnn.preprocess        imagen (PIL o PNG) + plantilla -> crops/<label>/*.png  *** deteccion de digitos (enchufable) ***
                             (zonal por plantilla = oficial; filtra vacias via es_celda_escrita)
 actas_cnn.data              build_manifest (path,label) + CropsDataset
 actas_cnn.training          ResNet-18 CIFAR (modelo del proyecto) sobre MPS/CUDA/CPU
