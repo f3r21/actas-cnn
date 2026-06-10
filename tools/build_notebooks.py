@@ -117,14 +117,26 @@ SUBIR_A_HF = True  # publica crops_bundle.tar.gz en HF (requiere HF_TOKEN)
 # todo. Sin esto, re-correr salta las actas ya hechas (publicarias crops viejos).
 REHACER_DESDE_CERO = False
 if SUBIR_A_HF:
-    from huggingface_hub import get_token
-    if get_token() is None:
-        # Frenar AHORA y no tras ~40 min de procesamiento, cuando fallaria la subida.
-        raise RuntimeError(
-            "No hay HF_TOKEN y SUBIR_A_HF=True: la subida final fallaria al terminar. "
-            "Agrega HF_TOKEN en el panel de secretos de Colab (icono de la llave; "
-            "permiso de escritura; dale acceso a este notebook) y re-corre esta "
-            "celda, o pon SUBIR_A_HF=False. Se configura UNA sola vez por cuenta.")''', con_gpu=False)),
+    import os
+    if not os.environ.get("HF_TOKEN"):
+        # En Colab, leer el secreto directo y exportarlo como env var. No usar
+        # get_token() para esto: cachea por sesion, y si la primera consulta fue
+        # antes de dar acceso al secreto, devuelve None para siempre.
+        try:
+            from google.colab import userdata
+            os.environ["HF_TOKEN"] = userdata.get("HF_TOKEN")
+        except Exception:  # fuera de Colab, o secreto ausente / sin acceso
+            pass
+    if not os.environ.get("HF_TOKEN"):
+        from huggingface_hub import get_token  # local: .env o token cacheado
+        if get_token() is None:
+            # Frenar AHORA y no tras ~40 min, cuando fallaria la subida final.
+            raise RuntimeError(
+                "No hay HF_TOKEN y SUBIR_A_HF=True: la subida final fallaria al "
+                "terminar. Agrega HF_TOKEN en el panel de secretos de Colab (icono "
+                "de la llave; permiso de escritura; ACTIVA el acceso para este "
+                "notebook) y re-corre esta celda, o pon SUBIR_A_HF=False. Se "
+                "configura UNA sola vez por cuenta.")''', con_gpu=False)),
         code(CELL_TEMPLATE),
         md("## 1. PREPROCESAMIENTO — deteccion de digitos (editar aqui)"),
         code(C.PREPROCESS),
