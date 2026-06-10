@@ -82,6 +82,7 @@ FIELD_VALUE_FOR = r'''def field_value_for(name, votos_acta, total_emitidos):
 
 LABELS_BUILD = r'''# === Labels desde el ground truth ONPE + armado de crops/manifest ===
 import csv
+import numpy as np
 import pandas as pd
 
 def es_celda_escrita(value, n_cells, pos):
@@ -97,8 +98,102 @@ def int_to_digits(value, n_cells):
 
 ''' + FIELD_VALUE_FOR + r'''
 
+# Etiquetado ink-aware: ~3% de las actas viola la convencion right-justified
+# (cifras desde la primera celda o centradas) y el etiquetado posicional las
+# envenena (celdas vacias con label de digito, digitos con el label del
+# vecino); concentraban el 82% de los errores de campo en eval. Se detecta
+# donde cae la tinta y se remapean los labels SOLO cuando es confiable; el
+# resto de actas no cambia.
+
+def ventana_central(cell_img, mx=0.25, my=0.15):
+    """Centro de la celda (la tinta del digito cae al centro; el sangrado del
+    vecino y los bordes punteados quedan en los margenes)."""
+    w, h = cell_img.size
+    box = (int(w * mx), int(h * my), int(w * (1 - mx)), int(h * (1 - my)))
+    return np.asarray(cell_img.crop(box).convert("L"), dtype=np.uint8)
+
+def umbral_adaptativo(arrays, delta=55):
+    """Umbral de oscuridad relativo al fondo del escaneo de ESTA acta (un
+    umbral fijo falla en escaneos grisaceos)."""
+    fondo = int(np.median(np.concatenate([a.ravel() for a in arrays])))
+    return int(np.clip(fondo - delta, 40, 200))
+
+def patron_de_tinta(fracs, piso=0.07, rel=0.55):
+    """(patron, run, inked) segun el run de tinta del campo: RIGHT (cumple la
+    convencion), LEFT/MEDIO (corrido), OTRO (salteado), AMBIGUO (tenue).
+    Corte relativo al maximo del campo."""
+    fmax = max(fracs)
+    if fmax < piso:
+        return "AMBIGUO", None, tuple(False for _ in fracs)
+    corte = max(piso, rel * fmax)
+    inked = tuple(f >= corte for f in fracs)
+    runs, i = [], 0
+    while i < len(inked):
+        if inked[i]:
+            j = i
+            while j < len(inked) and inked[j]:
+                j += 1
+            runs.append((i, j)); i = j
+        else:
+            i += 1
+    if len(runs) != 1:
+        return "OTRO", None, inked
+    a, b = runs[0]
+    if b == len(inked):
+        return "RIGHT", (a, b), inked
+    if a == 0:
+        return "LEFT", (a, b), inked
+    return "MEDIO", (a, b), inked
+
+def remapeo_ink_aware(cells, template, votos_acta, total, min_informativos=4,
+                      umbral_viola=0.5, piso=0.07):
+    """{campo: {pos: label}} SOLO si la acta viola la convencion y el remapeo
+    es confiable; {} en el caso normal. Nunca empeora el statu quo."""
+    centros = {n: [ventana_central(c) for c in cs] for n, cs in cells.items()}
+    intensidad = umbral_adaptativo([a for cs in centros.values() for a in cs])
+    analisis = {}
+    for f in template["fields"]:
+        value = field_value_for(f["name"], votos_acta, total)
+        if value <= 0:
+            continue
+        fracs = [float((a < intensidad).sum() / a.size) for a in centros[f["name"]]]
+        analisis[f["name"]] = (value, fracs, *patron_de_tinta(fracs))
+    conteo = {}
+    for _, _, patron, _, _ in analisis.values():
+        conteo[patron] = conteo.get(patron, 0) + 1
+    informativos = sum(conteo.get(p, 0) for p in ("RIGHT", "LEFT", "MEDIO", "OTRO"))
+    viola = conteo.get("LEFT", 0) + conteo.get("MEDIO", 0)
+    if informativos < min_informativos or viola / informativos < umbral_viola:
+        return {}
+    candidatos = []
+    for name, (value, fracs, patron, run, _) in analisis.items():
+        if patron not in ("LEFT", "MEDIO") or run is None:
+            continue
+        digitos = [int(c) for c in str(value)]
+        if run[1] - run[0] == len(digitos):
+            candidatos.append((name, run, digitos))
+    if not candidatos:
+        return {}
+    # Offset vs violacion: si la celda que la convencion espera escrita TAMBIEN
+    # tiene tinta (medida a celda completa), el digito quedo a caballo entre
+    # ventanas por offset del escaneo y el etiquetado posicional ya es correcto.
+    evidencias = []
+    for name, run, digitos in candidatos:
+        n_cells = len(analisis[name][1])
+        fuera = [p for p in range(n_cells - len(digitos), n_cells)
+                 if not run[0] <= p < run[1]]
+        fulls = [ventana_central(cells[name][p], 0.05, 0.05) for p in fuera]
+        if fulls:
+            evidencias.append(max(float((a < intensidad).sum() / a.size)
+                                  for a in fulls))
+    if evidencias and float(np.median(evidencias)) >= piso:
+        return {}
+    return {name: dict(zip(range(run[0], run[1]), digitos))
+            for name, run, digitos in candidatos}
+
 def build_crops_for_acta(image, archivo_id, id_acta, template,
-                         votos, cabecera, crops_root, filtrar_vacias=True):
+                         votos, cabecera, crops_root, filtrar_vacias=True,
+                         ink_aware=True):
     """Imagen (PIL o ruta) + labels -> crops/<label>/<archivoId>_<campo>_c<pos>.png.
     Devuelve (guardados, filtrados)."""
     cab = cabecera[cabecera["idActa"] == id_acta]
@@ -107,16 +202,22 @@ def build_crops_for_acta(image, archivo_id, id_acta, template,
     total = int(cab.iloc[0]["totalVotosEmitidos"])
     votos_acta = votos[votos["idActa"] == id_acta]
     cells = localize_digits(image, template)
+    remap = remapeo_ink_aware(cells, template, votos_acta, total) if ink_aware else {}
     crops_root = Path(crops_root)
     n_saved = n_filt = 0
     for field in template["fields"]:
         name, n_cells = field["name"], field["n_digits"]
         value = field_value_for(name, votos_acta, total)
-        labels = int_to_digits(value, n_cells)
-        for pos, (label, dimg) in enumerate(zip(labels, cells[name])):
-            if filtrar_vacias and not es_celda_escrita(value, n_cells, pos):
+        if name in remap:
+            etiqueta_en = remap[name]
+        else:
+            labels = int_to_digits(value, n_cells)
+            etiqueta_en = {p: labels[p] for p in range(n_cells)
+                           if not filtrar_vacias or es_celda_escrita(value, n_cells, p)}
+        for pos, dimg in enumerate(cells[name]):
+            if pos not in etiqueta_en:
                 n_filt += 1; continue
-            d = crops_root / str(label); d.mkdir(parents=True, exist_ok=True)
+            d = crops_root / str(etiqueta_en[pos]); d.mkdir(parents=True, exist_ok=True)
             dimg.save(d / f"{archivo_id}_{name}_c{pos}.png")
             n_saved += 1
     return n_saved, n_filt
@@ -249,9 +350,12 @@ def parse_crop_path(rel):
     parts = Path(rel).stem.split("_")
     return parts[0], "_".join(parts[1:-1]), int(parts[-1][1:])
 
-def reconstruct_value(preds_by_pos, n_cells):
-    """Digitos predichos -> entero right-justified (posiciones faltantes = 0)."""
-    return int("".join(str(preds_by_pos.get(p, 0)) for p in range(n_cells)))
+def reconstruct_value(preds_by_pos):
+    """Concatena los digitos predichos de las celdas presentes, en orden.
+    Right-justified e ink-aware por igual: la posicion es orden de lectura."""
+    if not preds_by_pos:
+        return 0
+    return int("".join(str(preds_by_pos[p]) for p in sorted(preds_by_pos)))
 
 @torch.no_grad()
 def evaluate_split(model, manifest, crops_root, template, archivos, votos, cabecera, device):
@@ -280,9 +384,9 @@ def evaluate_split(model, manifest, crops_root, template, archivos, votos, cabec
             continue
         total = int(cab.iloc[0]["totalVotosEmitidos"])
         va = votos[votos["idActa"] == ida]
-        for fname, n_cells in field_specs.items():
+        for fname in field_specs:
             cf = da[da["field"] == fname]
-            pv = reconstruct_value(dict(zip(cf["pos"], cf["pred"])), n_cells)
+            pv = reconstruct_value(dict(zip(cf["pos"], cf["pred"])))
             rv = field_value_for(fname, va, total)
             rows.append({"archivoId": aid, "field": fname, "pred": pv, "real": rv,
                          "correct": pv == rv, "error": pv - rv})
