@@ -338,7 +338,9 @@ except Exception as e:
 with tarfile.open(bundle) as t: t.extractall(WORK)
 print("crops_bundle extraido")'''),
         md("## 3. Entrenamiento"),
-        code('''model = train_model(DATA / "manifest_train.csv", DATA / "crops_train", DEVICE, epochs=EPOCHS)'''),
+        code('''# Ejecutamos la receta ls_ra_mu_cos (augments) para replicar/superar el 90.33% oficial.
+model = train_model(DATA / "manifest_train.csv", DATA / "crops_train", DEVICE, epochs=EPOCHS,
+                    randaugment=True, mixup=0.2, cosine_lr=True, label_smoothing=0.1)'''),
         md("## 4. Evaluacion + metricas finales"),
         code('''df, res = evaluate_split(model, DATA / "manifest_val.csv", DATA / "crops_val",
                          TEMPLATE, archivos, votos, cabecera, DEVICE)
@@ -357,6 +359,26 @@ if csv_map:
     print("\\nablations:"); print(ablations_table(csv_map).round(4))
 else:
     print("\\n(ablations: corre scripts/evaluate.py por variante en local para la tabla del informe)")'''),
+        md("## 6. Persistir el modelo oficial (opcional)"),
+        code('''# Guarda el checkpoint en el repositorio (requiere HF_TOKEN con permisos de escritura)
+import os
+from huggingface_hub import HfApi
+
+if os.environ.get("HF_TOKEN") or "HF_TOKEN" in os.environ:
+    try:
+        api = HfApi()
+        # Se requiere subir a actas-cnn-model (u otro repo)
+        api.upload_file(
+            path_or_fileobj="resnet18_best.pt",
+            path_in_repo="resnet18_best.pt",
+            repo_id="f3r21/actas-cnn-model",
+            repo_type="model"
+        )
+        print("Modelo oficial subido a f3r21/actas-cnn-model!")
+    except Exception as e:
+        print(f"Error al subir: {e}")
+else:
+    print("HF_TOKEN no configurado. El archivo resnet18_best.pt se queda en el entorno local (descargalo manualmente si quieres conservarlo).")'''),
         md("---\n**Cierre.** Pipeline completo desde el PDF del acta hasta las metricas de "
            "reconstruccion de votos. Modelo: ResNet-18 estilo CIFAR. El detalle "
            "metodologico y los experimentos (preprocesamiento alternativo, solver) viven "

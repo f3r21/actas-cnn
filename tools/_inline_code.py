@@ -330,13 +330,20 @@ def train_model(manifest, root, device, epochs=20, lr=5e-4, batch_size=128,
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs) if cosine_lr else None
     best = 0.0
+    best_state = None
     for ep in range(1, epochs + 1):
         _, tra = run_epoch(model, trl, device, crit, opt, mixup_alpha=mixup)
         _, vaa = run_epoch(model, val, device, crit)
         if sched: sched.step()
-        best = max(best, vaa)
+        if vaa > best:
+            best = vaa
+            import copy
+            best_state = copy.deepcopy(model.state_dict())
+            torch.save(best_state, "resnet18_best.pt")
         print(f"epoch {ep:02d}  train_acc {tra:.4f}  val_acc {vaa:.4f}")
-    print(f"mejor val_acc (holdout interno): {best:.4f}")
+    if best_state is not None:
+        model.load_state_dict(best_state)
+    print(f"mejor val_acc (holdout interno): {best:.4f} guardado en resnet18_best.pt")
     return model'''
 
 # --- Evaluacion downstream (digit/field/acta-level + reconstruccion) ---------
