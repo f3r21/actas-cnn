@@ -87,6 +87,65 @@ DATA = WORK / "data"; DATA.mkdir(parents=True, exist_ok=True)
 {modo_block}'''
 
 
+# --- celda compartida: baja el bundle ink-aware + labels (notebooks 02 y 03) -
+
+DOWNLOAD_BUNDLE = '''from huggingface_hub import hf_hub_download, snapshot_download
+
+snapshot_download(HF_DATASET_REPO, repo_type="dataset", allow_patterns="labels/*",
+                  local_dir=str(DATA))
+archivos = pd.read_parquet(DATA / "labels/actas_archivos.parquet")
+votos    = pd.read_parquet(DATA / "labels/actas_votos.parquet")
+cabecera = pd.read_parquet(DATA / "labels/actas_cabecera.parquet")
+
+# Crops preprocesados publicados por 01_preprocesamiento_colab.ipynb.
+try:
+    bundle = hf_hub_download(HF_DATASET_REPO, "crops_bundle.tar.gz", repo_type="dataset")
+except Exception as e:
+    raise RuntimeError("No hay crops_bundle.tar.gz en HF. Corre "
+                       "01_preprocesamiento_colab.ipynb primero.") from e
+with tarfile.open(bundle) as t: t.extractall(WORK)
+print("crops_bundle extraido")'''
+
+
+# --- celda de ablacion (notebook 03): entrena 3 variantes y compara ----------
+
+ABLATION = '''# Ablacion ink-aware: re-entrena 3 variantes sobre los crops ink-aware y compara.
+# ls_ra_mu_cos es la receta del entregable (02); base y ls_ra son los escalones previos.
+import pandas as pd
+
+VARIANTES = [
+    ("base",         {}),
+    ("ls_ra",        {"label_smoothing": 0.1, "randaugment": True}),
+    ("ls_ra_mu_cos", {"label_smoothing": 0.1, "randaugment": True,
+                      "mixup": 0.2, "cosine_lr": True}),
+]
+
+filas = []
+for nombre, kw in VARIANTES:
+    print(f"\\n========== entrenando {nombre} ==========")
+    m = train_model(DATA / "manifest_train.csv", DATA / "crops_train", DEVICE,
+                    epochs=EPOCHS, **kw)
+    torch.save({"model": m.state_dict(), "arch": "resnet18"},
+               WORK / f"resnet18_ink_{nombre}_best.pt")
+    dfv, resv = evaluate_split(m, DATA / "manifest_val.csv", DATA / "crops_val",
+                               TEMPLATE, archivos, votos, cabecera, DEVICE)
+    mv = report_metrics(dfv, resv, split=f"val/{nombre}")
+    dft, rest = evaluate_split(m, DATA / "manifest_test.csv", DATA / "crops_test",
+                               TEMPLATE, archivos, votos, cabecera, DEVICE)
+    mt = report_metrics(dft, rest, split=f"test/{nombre}")
+    filas.append({"variante": nombre,
+                  "val_digit": mv["digit"], "val_field": mv["field"],
+                  "val_acta": mv["acta"], "val_mae": mv["total_mae"],
+                  "test_digit": mt["digit"], "test_field": mt["field"],
+                  "test_acta": mt["acta"], "test_mae": mt["total_mae"]})
+
+tabla = pd.DataFrame(filas)
+print("\\n=== Ablacion ink-aware (val + test) ===")
+print(tabla.round(4).to_string(index=False))
+tabla.to_csv(DATA / "ablations_ink_summary.csv", index=False)
+print("\\nguardado: data/ablations_ink_summary.csv + checkpoints resnet18_ink_*_best.pt (en la VM, efimeros)")'''
+
+
 # === Notebook 01: preprocesamiento ==========================================
 
 def build_preprocesamiento() -> nbf.NotebookNode:
@@ -321,30 +380,20 @@ EPOCHS = 20'''
         code(C.EVAL),
         code(C.METRICS),
         md("## 2. Datos: crops preprocesados (cache de HF)"),
-        code('''from huggingface_hub import hf_hub_download, snapshot_download
-
-snapshot_download(HF_DATASET_REPO, repo_type="dataset", allow_patterns="labels/*",
-                  local_dir=str(DATA))
-archivos = pd.read_parquet(DATA / "labels/actas_archivos.parquet")
-votos    = pd.read_parquet(DATA / "labels/actas_votos.parquet")
-cabecera = pd.read_parquet(DATA / "labels/actas_cabecera.parquet")
-
-# Crops preprocesados publicados por 01_preprocesamiento_colab.ipynb.
-try:
-    bundle = hf_hub_download(HF_DATASET_REPO, "crops_bundle.tar.gz", repo_type="dataset")
-except Exception as e:
-    raise RuntimeError("No hay crops_bundle.tar.gz en HF. Corre "
-                       "01_preprocesamiento_colab.ipynb primero.") from e
-with tarfile.open(bundle) as t: t.extractall(WORK)
-print("crops_bundle extraido")'''),
+        code(DOWNLOAD_BUNDLE),
         md("## 3. Entrenamiento"),
         code('''# Ejecutamos la receta ls_ra_mu_cos (augments) para replicar/superar el 90.33% oficial.
 model = train_model(DATA / "manifest_train.csv", DATA / "crops_train", DEVICE, epochs=EPOCHS,
                     randaugment=True, mixup=0.2, cosine_lr=True, label_smoothing=0.1)'''),
         md("## 4. Evaluacion + metricas finales"),
-        code('''df, res = evaluate_split(model, DATA / "manifest_val.csv", DATA / "crops_val",
+        code('''# Evaluacion sobre val (split oficial) y sobre test.
+df, res = evaluate_split(model, DATA / "manifest_val.csv", DATA / "crops_val",
                          TEMPLATE, archivos, votos, cabecera, DEVICE)
-metrics = report_metrics(df, res)'''),
+metrics = report_metrics(df, res, split="val")
+
+df_test, res_test = evaluate_split(model, DATA / "manifest_test.csv", DATA / "crops_test",
+                                   TEMPLATE, archivos, votos, cabecera, DEVICE)
+metrics_test = report_metrics(df_test, res_test, split="test")'''),
         md("## 5. Visualizaciones + tabla de ablations"),
         code('''cm, prf = confusion_and_prf(df)
 plot_confusion(cm, metrics["digit"])
@@ -383,6 +432,47 @@ else:
            "reconstruccion de votos. Modelo: ResNet-18 estilo CIFAR. El detalle "
            "metodologico y los experimentos (preprocesamiento alternativo, solver) viven "
            "en el repo (`docs/`, `experiments/`)."),
+    ]
+    return _nb(cells)
+
+
+# === Notebook 03: ablacion ink-aware ========================================
+
+def build_ablaciones() -> nbf.NotebookNode:
+    config = '''# Epochs por variante (~5-8 min cada una en T4).
+EPOCHS = 20'''
+    cells = [
+        badge("03_ablaciones_colab.ipynb"),
+        md("# actas-cnn — Ablacion ink-aware (Colab)\n\n"
+           "Re-entrena las **3 variantes** (base, ls_ra, ls_ra_mu_cos) sobre los crops "
+           "**ink-aware** publicados por `01_preprocesamiento_colab.ipynb` y las compara "
+           "en **val y test** en una sola tabla, sin mezclar etiquetados "
+           "(right-justified vs ink-aware). `ls_ra_mu_cos` es la misma receta que entrena "
+           "el entregable `02`.\n\n"
+           "**Prerequisito:** `01_preprocesamiento_colab.ipynb` ya publico el bundle "
+           "ink-aware en HF.\n\n"
+           "**Como correr:** Runtime -> Change runtime type -> **T4 GPU**, luego Run all. "
+           "Son 3 entrenamientos: ~20-35 min en T4."),
+        md("## 0. Setup"),
+        code(C.INSTALL),
+        code(config_cell(config)),
+        code(CELL_TEMPLATE),
+        md("## 1. Codigo del modelo (inline)"),
+        code(C.MODEL),
+        code(C.DATASET),
+        code(C.TRAIN),
+        code(C.EVAL),
+        md("## 2. Datos: crops ink-aware + labels"),
+        code(DOWNLOAD_BUNDLE),
+        md("## 3. Ablacion: entrena 3 variantes y compara (val + test)\n\n"
+           "Cada variante se entrena desde cero con su receta y se evalua en val y test "
+           "(reconstruccion vs parquets ONPE). La tabla va a "
+           "`data/ablations_ink_summary.csv`; los checkpoints `resnet18_ink_*_best.pt` "
+           "quedan en la VM (efimeros) — subilos a HF si queres conservar el ganador."),
+        code(ABLATION),
+        md("---\nListo. Tabla comparativa ink-aware (val+test). Para promover el ganador "
+           "a oficial, sube su `resnet18_ink_<variante>_best.pt` a "
+           "`f3r21/actas-cnn-model` y actualiza README/CLAUDE."),
     ]
     return _nb(cells)
 
@@ -431,6 +521,7 @@ def main() -> None:
     outputs = {
         out / "01_preprocesamiento_colab.ipynb": build_preprocesamiento(),
         out / "02_modelo_colab.ipynb": build_modelo(),
+        out / "03_ablaciones_colab.ipynb": build_ablaciones(),
     }
     print("escritos:")
     for path, nb in outputs.items():

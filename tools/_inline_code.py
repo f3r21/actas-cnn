@@ -404,7 +404,7 @@ def evaluate_split(model, manifest, crops_root, template, archivos, votos, cabec
               f"({n_total - n_eval} sin ground truth en los parquets)")
     return df, res
 
-def report_metrics(df, res):
+def report_metrics(df, res, split="val"):
     """Imprime y devuelve el dict de metricas oficiales."""
     digit = float(df["pred"].eq(df["label"]).mean())
     field = float(res["correct"].mean())
@@ -412,6 +412,7 @@ def report_metrics(df, res):
     no_tot = res[res["field"] != "total_ciudadanos"]
     err = (no_tot.groupby("archivoId")["pred"].sum() - no_tot.groupby("archivoId")["real"].sum())
     mae = float(err.abs().mean()); exact = float((err == 0).mean() * 100)
+    print(f"== {split.upper()} ==")
     print(f"digit-level : {digit:.4f}  (n={len(df)})")
     print(f"field-level : {field:.4f}")
     print(f"acta-level  : {acta:.4f}")
