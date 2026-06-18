@@ -135,21 +135,23 @@ evaluacion sobre test del proyecto):
 |---|---|---|---|---|---|
 | base | 98.70% | 99.23% | 88.46% | 91.63% | 2.00 |
 | ls_ra | 98.79% | 99.32% | 89.61% | 92.78% | 1.70 |
-| ls_ra_mu_cos | **98.85%** | **99.36%** | **90.48%** | **93.80%** | **1.58** |
+| ls_ra_mu_cos | **98.83%** | **99.34%** | **90.62%** | **93.80%** | **1.77** |
 
 **test (ink-aware):**
 | Variante | Digit | Field | Acta | Recon. | MAE |
 |---|---|---|---|---|---|
 | base | 98.07% | 98.84% | 86.58% | 89.55% | 2.44 |
 | ls_ra | 98.24% | 98.95% | 87.71% | 90.68% | 2.44 |
-| ls_ra_mu_cos | **98.28%** | **98.99%** | **88.42%** | **91.67%** | **2.07** |
+| ls_ra_mu_cos | **98.31%** | **99.00%** | **88.84%** | **91.95%** | **2.12** |
 
-`base`/`ls_ra` salen de `03_ablaciones_colab.ipynb`; `ls_ra_mu_cos` de `02`
-(la corrida de 03 se corto en epoch 16 de esa variante). Train fresco sin
-semilla (±0.5pp corrida-a-corrida). El checkpoint .pt todavia no esta subido
-a HF. La mejora del etiquetado se nota sobre todo en field/MAE; el acta-level
-del ganador queda ~90.5 val / 88.4 test, y la brecha val->test (~0.6pp digit,
-~2pp acta) indica buena generalizacion sin overfit.
+`base`/`ls_ra` salen de `03_ablaciones_colab.ipynb`; `ls_ra_mu_cos` es del run
+publicado en HF (`02`; la corrida de 03 se corto en epoch 16 de esa variante).
+Train fresco sin semilla (±0.5pp corrida-a-corrida). El checkpoint oficial se
+publico en HF el 2026-06-18 (`resnet18_best.pt` en `f3r21/actas-cnn-model`,
+sobre el bundle ink-aware). El ranking de accuracy/recon se sostiene en val y
+test; el MAE val del ganador (1.77) queda a la par de `ls_ra` (1.70) por ruido
+entre corridas. La brecha val->test (~0.5pp digit, ~1.8pp acta) indica buena
+generalizacion sin overfit.
 
 ## Mejoras no exploradas (trabajo futuro)
 

@@ -15,24 +15,25 @@ Incluye la **primera evaluacion sobre el split test** del proyecto:
 
 | Metrica | val | test |
 |---|---|---|
-| Digit-level accuracy | **98.85%** | **98.28%** |
-| Field-level accuracy | **99.36%** | **98.99%** |
-| **Acta-level** (los 42 campos correctos) | **90.48%** | **88.42%** |
-| **Reconstruccion exacta del total** | **93.80%** | **91.67%** |
-| MAE del total agregado | 1.58 votos | 2.07 votos |
+| Digit-level accuracy | **98.83%** | **98.31%** |
+| Field-level accuracy | **99.34%** | **99.00%** |
+| **Acta-level** (los 42 campos correctos) | **90.62%** | **88.84%** |
+| **Reconstruccion exacta del total** | **93.80%** | **91.95%** |
+| MAE del total agregado | 1.77 votos | 2.12 votos |
 
 Modelo: **ResNet-18 estilo CIFAR** (He et al., 2015), 11.17M params, entrada
-32×32 px en escala de grises. Numeros del run en Colab sobre los crops
-ink-aware (train fresco, sin semilla fija: ±0.5pp corrida-a-corrida).
+32×32 px en escala de grises. Numeros del **checkpoint publicado en HF**
+(`f3r21/actas-cnn-model`, run del 2026-06-18; train fresco sin semilla fija,
+±0.5pp corrida-a-corrida).
 
 > **Etiquetado ink-aware:** ~3% de las actas escribe las cifras sin respetar
 > la convencion right-justified de ONPE y concentraban el 82% de los errores
 > de campo. Corregir el etiquetado (ver [`docs/04`](docs/04-modelo-entrenamiento.md))
 > sube el field-level de **98.87%** (viejo oficial base, labels mayo) a
-> **99.23%** (base ink-aware), y la receta `ls_ra_mu_cos` lo lleva a **99.36%**
-> (val). El `crops_bundle.tar.gz` en HF ya es ink-aware; el checkpoint
-> re-entrenado todavia esta **pendiente de subir a HF** (alli sigue el
-> `resnet18_best.pt` base de mayo).
+> **99.23%** (base ink-aware), y la receta `ls_ra_mu_cos` lo lleva a **99.34%**
+> (val). El `crops_bundle.tar.gz` en HF ya es ink-aware y el checkpoint oficial
+> `resnet18_best.pt` (ls_ra_mu_cos ink-aware) **ya esta publicado en HF**
+> (`f3r21/actas-cnn-model`, 2026-06-18), sobrescribiendo el base de mayo.
 
 ### Ablations de regularizacion (etiquetado ink-aware, val + test)
 
@@ -45,19 +46,22 @@ suma de forma monotona.
 |---|---|---|---|---|---|---|
 | base | sin augmentation | 98.70% | 99.23% | 88.46% | 91.63% | 2.00 |
 | ls_ra | label smoothing + RandAugment | 98.79% | 99.32% | 89.61% | 92.78% | 1.70 |
-| ls_ra_mu_cos | + mixup + cosine LR | **98.85%** | **99.36%** | **90.48%** | **93.80%** | **1.58** |
+| ls_ra_mu_cos | + mixup + cosine LR | **98.83%** | **99.34%** | **90.62%** | **93.80%** | **1.77** |
 
 **test:**
 | Variante | Config | Digit | Field | Acta | Recon. | MAE |
 |---|---|---|---|---|---|---|
 | base | sin augmentation | 98.07% | 98.84% | 86.58% | 89.55% | 2.44 |
 | ls_ra | label smoothing + RandAugment | 98.24% | 98.95% | 87.71% | 90.68% | 2.44 |
-| ls_ra_mu_cos | + mixup + cosine LR | **98.28%** | **98.99%** | **88.42%** | **91.67%** | **2.07** |
+| ls_ra_mu_cos | + mixup + cosine LR | **98.31%** | **99.00%** | **88.84%** | **91.95%** | **2.12** |
 
 `base` y `ls_ra` salen de `03_ablaciones_colab.ipynb`; la fila `ls_ra_mu_cos`
-es de `02` (la corrida de 03 se corto antes de evaluar esa variante). La brecha
-val→test es modesta (~0.6pp digit, ~2pp acta): generaliza bien, sin overfit.
-Detalle en [`docs/04-modelo-entrenamiento.md`](docs/04-modelo-entrenamiento.md).
+es del run publicado en HF (`02`; la corrida de 03 se corto antes de evaluar
+esa variante). El ranking de accuracy y reconstruccion se sostiene en val y
+test; solo el MAE val de `ls_ra_mu_cos` (1.77) queda a la par de `ls_ra` (1.70)
+por ruido entre corridas sin semilla. La brecha val→test es modesta (~0.5pp
+digit, ~1.8pp acta): generaliza bien, sin overfit. Detalle en
+[`docs/04-modelo-entrenamiento.md`](docs/04-modelo-entrenamiento.md).
 
 Detalle completo del proyecto y del pipeline en
 [`CLAUDE.md`](CLAUDE.md) y en [`docs/`](docs/).
