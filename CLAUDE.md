@@ -4,8 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Lee tambien `docs/` en orden para el contexto completo (00-contexto, 01-decisiones,
 03-pipeline-datos, 04-modelo-entrenamiento, 05-backlog, 06-definicion-proyecto,
-07-presentacion-outline). La doc del side-project de migracion se archivo en
-`archive/migracion/02-migracion.md`.
+07-presentacion-outline, 08-walkthrough-codigo). La doc del side-project de
+migracion se archivo en `archive/migracion/02-migracion.md`.
+
+`docs/08-walkthrough-codigo.md` explica el codigo de los notebooks 01/02 a fondo
+(bloque por bloque + decisiones de implementacion); util para la presentacion.
 
 ## Que es esto
 
