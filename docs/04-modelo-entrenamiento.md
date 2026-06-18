@@ -89,8 +89,10 @@ Lectura: la regularizacion gana poco a nivel digito (+0.09pp) pero el
 efecto se compone en las metricas agregadas — acta-level sube +1.88pp
 (13 actas mas perfectas) y la reconstruccion exacta +1.44pp. La
 combinacion completa (`ls_ra_mu_cos`) domina en todas las metricas.
-`resnet18_best.pt` (base) sigue siendo el checkpoint publicado en HF;
-promover `ls_ra_mu_cos` es decision pendiente.
+
+> Esta tabla es right-justified (labels mayo), conservada como referencia
+> historica. **Superada por la ablacion ink-aware** (seccion siguiente),
+> que es la receta oficial desde 2026-06-18.
 
 ## Etiquetado ink-aware (2026-06-10)
 
@@ -121,11 +123,33 @@ Acta-level sube poco porque los campos no remapeables (escritura muy
 apretada o tenue) siguen mal en esas mismas actas; el retrain sobre
 train limpio (Colab, pendiente) puede mejorarlo mas.
 
-**Procedencia del modelo oficial ink-aware**: pendiente de
-`02_modelo_colab.ipynb` en Colab T4 sobre el `crops_bundle.tar.gz`
-republicado (decision 2026-06-10: el oficial sale del entregable
-reproducible, no de un retrain local). Las metricas de arriba son
-eval-side; las del modelo re-entrenado saldran de esa corrida.
+## Modelo oficial ink-aware re-entrenado (2026-06-18)
+
+Corrido el entregable en Colab sobre el bundle ink-aware. La receta
+`ls_ra_mu_cos` (la ganadora de las ablations) es la oficial; las ablations
+re-corridas sobre ink-aware confirman el ranking en val **y test** (primera
+evaluacion sobre test del proyecto):
+
+**val (ink-aware):**
+| Variante | Digit | Field | Acta | Recon. | MAE |
+|---|---|---|---|---|---|
+| base | 98.70% | 99.23% | 88.46% | 91.63% | 2.00 |
+| ls_ra | 98.79% | 99.32% | 89.61% | 92.78% | 1.70 |
+| ls_ra_mu_cos | **98.85%** | **99.36%** | **90.48%** | **93.80%** | **1.58** |
+
+**test (ink-aware):**
+| Variante | Digit | Field | Acta | Recon. | MAE |
+|---|---|---|---|---|---|
+| base | 98.07% | 98.84% | 86.58% | 89.55% | 2.44 |
+| ls_ra | 98.24% | 98.95% | 87.71% | 90.68% | 2.44 |
+| ls_ra_mu_cos | **98.28%** | **98.99%** | **88.42%** | **91.67%** | **2.07** |
+
+`base`/`ls_ra` salen de `03_ablaciones_colab.ipynb`; `ls_ra_mu_cos` de `02`
+(la corrida de 03 se corto en epoch 16 de esa variante). Train fresco sin
+semilla (±0.5pp corrida-a-corrida). El checkpoint .pt todavia no esta subido
+a HF. La mejora del etiquetado se nota sobre todo en field/MAE; el acta-level
+del ganador queda ~90.5 val / 88.4 test, y la brecha val->test (~0.6pp digit,
+~2pp acta) indica buena generalizacion sin overfit.
 
 ## Mejoras no exploradas (trabajo futuro)
 

@@ -17,7 +17,7 @@ electorales de las Elecciones Generales del Peru 2026.
   `docs/06-definicion-proyecto.md`.
 - Presentacion final: 18/06/2026.
 
-## Estado actual (2026-06-10, etiquetado ink-aware)
+## Estado actual (2026-06-18, modelo oficial ink-aware re-entrenado)
 
 - **Hallazgo y fix de etiquetado (2026-06-10)**: ~3% de las actas viola
   la convencion right-justified de ONPE (escribe las cifras corridas a
@@ -37,14 +37,25 @@ electorales de las Elecciones Generales del Peru 2026.
   (-52%), **0 regresiones** en las otras 673 actas. El fix esta
   propagado a los notebooks Colab y al `crops_bundle.tar.gz` republicado
   en HF (2026-06-10).
-- **Modelo oficial ink-aware: PENDIENTE de Colab**. Decision del usuario
-  (2026-06-10): el modelo oficial ink-aware sale de correr
-  `02_modelo_colab.ipynb` en Colab T4 sobre el bundle nuevo (mismo
-  entorno reproducible del entregable), no de un retrain local. Hasta
-  esa corrida, las metricas oficiales publicadas siguen siendo las de
-  `resnet18_best.pt` (entrenado con labels right-justified, abajo). Los
-  crops locales canonicos `data/crops_<split>` ya son ink-aware; los de
-  mayo quedaron como respaldo `data/crops_<split>_mayo`.
+- **Modelo oficial ink-aware: ENTRENADO en Colab (2026-06-18)**. Se
+  corrieron los tres notebooks sobre el bundle ink-aware. La receta
+  ganadora `ls_ra_mu_cos` (label smoothing + RandAugment + mixup +
+  cosine LR) es ahora la oficial; metricas del run en Colab
+  (`02_modelo_colab.ipynb`), **primera evaluacion sobre test incluida**:
+    - val:  digit 98.85%, field 99.36%, acta-level 90.48%, recon exacta 93.80%, MAE 1.58
+    - test: digit 98.28%, field 98.99%, acta-level 88.42%, recon exacta 91.67%, MAE 2.07
+  Train fresco sin semilla fija (±0.5pp corrida-a-corrida). El
+  **checkpoint .pt todavia no esta subido a HF** (los de Colab son
+  efimeros; en HF sigue el `resnet18_best.pt` base de mayo) — subirlo es
+  lo unico que queda para cerrar. Crops locales `data/crops_<split>` son
+  ink-aware; los de mayo quedan como respaldo `data/crops_<split>_mayo`.
+- **Ablacion limpia sobre ink-aware (2026-06-18, `03_ablaciones_colab.ipynb`)**:
+  el ranking `ls_ra_mu_cos > ls_ra > base` se sostiene en val Y test, de
+  forma monotona (tablas en `README.md` y `docs/04`). base/ls_ra salen de
+  03; `ls_ra_mu_cos` de 02 (la corrida de 03 se corto en epoch 16 de la
+  3a variante; falta re-correrla completa para auto-generar la tabla/CSV).
+  La brecha val->test es modesta (~0.6pp digit, ~2pp acta): generaliza
+  sin overfit.
 
 ## Estado heredado (2026-06-09, comparativa de ablations cerrada)
 
@@ -75,9 +86,10 @@ electorales de las Elecciones Generales del Peru 2026.
   `ls_ra_mu_cos` (label smoothing + RandAugment + mixup + cosine LR)
   domina en todas las metricas — digit 98.21%, field 98.93%, acta-level
   92.21% (+1.88pp vs base), reconstruccion exacta 95.24%, MAE 2.18.
-  `resnet18_best.pt` (base) sigue siendo el checkpoint publicado en HF
-  y el de las metricas oficiales de arriba; promover `ls_ra_mu_cos` a
-  oficial es decision pendiente del usuario.
+  `resnet18_best.pt` (base) sigue siendo el checkpoint publicado en HF;
+  promover `ls_ra_mu_cos` a oficial se decidio el 2026-06-18 sobre el
+  bundle ink-aware (ver "Estado actual" arriba), pero el checkpoint nuevo
+  aun no esta subido a HF.
 - **Evaluacion extendida ya generada**: matriz de confusion 10x10,
   per-class precision/recall/F1, histograma de errores y ranking
   worst-20 (`data/visualizaciones/evaluate_confusion_val.png`,
@@ -123,27 +135,18 @@ electorales de las Elecciones Generales del Peru 2026.
 **No hay informe ni slides que entregar** (decision del 2026-06-09). Lo
 que queda:
 
-1. **Modelo oficial ink-aware (PENDIENTE, en Colab)**: correr
-   `02_modelo_colab.ipynb` en Colab T4 sobre el `crops_bundle.tar.gz`
-   ink-aware republicado (2026-06-10). Esa corrida genera el checkpoint
-   y las metricas oficiales ink-aware (decision del usuario: el oficial
-   sale del entregable reproducible, no de un retrain local). Hasta
-   entonces, las metricas publicadas siguen siendo las de
-   `resnet18_best.pt` (labels right-justified). El delta ya medido del
-   lado de evaluacion: field 98.87 -> 99.45% (ver arriba y `docs/04`).
-2. **Decidir entre base e ink-aware como receta oficial**, y si promover
-   `ls_ra_mu_cos` (gana en las metricas right-justified): re-publicar
-   checkpoint en HF y actualizar README/CLAUDE. Idealmente re-correr las
-   ablations sobre el bundle ink-aware.
-3. Opcional: evaluar sobre el split `test` (todas las metricas son de
-   val) y refrescar `AUDIT_REPORT.md` (del 26-may; CHECK 3/6 necesitan
+1. **Subir el checkpoint oficial ink-aware a HF**. El modelo ya se
+   entreno en Colab (2026-06-18, receta `ls_ra_mu_cos`, metricas arriba),
+   pero el `.pt` quedo en la VM efimera; en HF sigue el `resnet18_best.pt`
+   base de mayo. Re-correr `02` con `HF_TOKEN` (su celda 6 sube el
+   checkpoint) o subir el `resnet18_*_best.pt` del run. La decision de
+   receta/etiquetado ya esta cerrada: **`ls_ra_mu_cos` ink-aware**.
+2. Opcional: **re-correr `03_ablaciones_colab.ipynb` completo** (la
+   ultima corrida se corto en epoch 16 de `ls_ra_mu_cos`) para
+   auto-generar la tabla y `data/ablations_ink_summary.csv` en una sola
+   pasada, en vez de tomar la fila de `ls_ra_mu_cos` del 02.
+3. Opcional: refrescar `AUDIT_REPORT.md` (CHECK 3/6 necesitan
    `data/pdfs_train/rendered/`, borrado el 06-01).
-
-> Nota: la verificacion end-to-end de ambos notebooks en Colab quedo
-> hecha el 2026-06-10 con el bundle right-justified (corrida fresca sin
-> semilla: digit 97.60%, acta 87.59%; bajo el checkpoint oficial por
-> variacion normal corrida-a-corrida). El item 1 la repite sobre el
-> bundle ink-aware.
 
 El backlog detallado esta en `docs/05-backlog.md`.
 

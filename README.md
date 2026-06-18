@@ -7,49 +7,65 @@ electorales presidenciales del Peru (Elecciones Generales 2026) con
 redes neuronales convolucionales en PyTorch. Proyecto del curso
 Topicos en Inteligencia Artificial (CCOMP9-1).
 
-## Resultados oficiales (val set, 693 actas, 29,106 campos)
+## Resultados oficiales — ResNet-18 `ls_ra_mu_cos`, etiquetado ink-aware
 
-| Metrica | Valor |
-|---|---|
-| Digit-level accuracy | **98.12%** |
-| Field-level accuracy | **98.87%** |
-| **Acta-level accuracy** (los 42 campos correctos) | **90.33%** |
-| **Reconstruccion exacta del total agregado** | **93.80%** (650/693) |
-| MAE del total agregado | 2.40 votos |
-| Mediana abs error | 0 |
-| Total ciudadanos correcto (campo 4 digitos) | 95.96% |
+Receta ganadora (label smoothing 0.1 + RandAugment + mixup 0.2 + cosine LR)
+entrenada sobre el bundle **ink-aware** en Colab (`02_modelo_colab.ipynb`).
+Incluye la **primera evaluacion sobre el split test** del proyecto:
 
-Modelo: **ResNet-18 estilo CIFAR** (He et al., 2015), 11.17M params,
-adaptada a entrada 32×32 px en escala de grises.
+| Metrica | val | test |
+|---|---|---|
+| Digit-level accuracy | **98.85%** | **98.28%** |
+| Field-level accuracy | **99.36%** | **98.99%** |
+| **Acta-level** (los 42 campos correctos) | **90.48%** | **88.42%** |
+| **Reconstruccion exacta del total** | **93.80%** | **91.67%** |
+| MAE del total agregado | 1.58 votos | 2.07 votos |
 
-> **Etiquetado ink-aware (2026-06-10):** ~3% de las actas escribe las
-> cifras sin respetar la convencion right-justified de ONPE, y
-> concentraban el 82% de los errores de campo. Corrigiendo el etiquetado
-> (ver [`docs/04`](docs/04-modelo-entrenamiento.md)) el field-level sube
-> a **99.45%** con el mismo modelo (eval-side, 0 regresiones). El
-> `crops_bundle.tar.gz` en HF ya es ink-aware; el checkpoint oficial
-> re-entrenado sobre el saldra de la proxima corrida de `02` en Colab.
+Modelo: **ResNet-18 estilo CIFAR** (He et al., 2015), 11.17M params, entrada
+32×32 px en escala de grises. Numeros del run en Colab sobre los crops
+ink-aware (train fresco, sin semilla fija: ±0.5pp corrida-a-corrida).
 
-### Ablations de regularizacion (val set)
+> **Etiquetado ink-aware:** ~3% de las actas escribe las cifras sin respetar
+> la convencion right-justified de ONPE y concentraban el 82% de los errores
+> de campo. Corregir el etiquetado (ver [`docs/04`](docs/04-modelo-entrenamiento.md))
+> sube el field-level de **98.87%** (viejo oficial base, labels mayo) a
+> **99.23%** (base ink-aware), y la receta `ls_ra_mu_cos` lo lleva a **99.36%**
+> (val). El `crops_bundle.tar.gz` en HF ya es ink-aware; el checkpoint
+> re-entrenado todavia esta **pendiente de subir a HF** (alli sigue el
+> `resnet18_best.pt` base de mayo).
 
-| Variante | Config | Digit | Field | Acta | Recon. exacta | MAE |
+### Ablations de regularizacion (etiquetado ink-aware, val + test)
+
+Tres variantes entrenadas sobre el bundle ink-aware en Colab. El ranking
+`ls_ra_mu_cos > ls_ra > base` se sostiene en **ambos splits** — cada mejora
+suma de forma monotona.
+
+**val:**
+| Variante | Config | Digit | Field | Acta | Recon. | MAE |
 |---|---|---|---|---|---|---|
-| base | sin augmentation | 98.12% | 98.87% | 90.33% | 93.80% | 2.40 |
-| ls_ra | label smoothing + RandAugment | 98.16% | 98.90% | 91.49% | 94.52% | 2.20 |
-| ls_ra_mu_cos | + mixup + cosine LR | **98.21%** | **98.93%** | **92.21%** | **95.24%** | **2.18** |
+| base | sin augmentation | 98.70% | 99.23% | 88.46% | 91.63% | 2.00 |
+| ls_ra | label smoothing + RandAugment | 98.79% | 99.32% | 89.61% | 92.78% | 1.70 |
+| ls_ra_mu_cos | + mixup + cosine LR | **98.85%** | **99.36%** | **90.48%** | **93.80%** | **1.58** |
 
-La regularizacion gana poco a nivel digito pero el efecto se compone en
-las metricas agregadas (+1.88pp acta-level). Tabla reproducible con
-`scripts/ablation_table.py` (detalle en
-[`docs/04-modelo-entrenamiento.md`](docs/04-modelo-entrenamiento.md)).
+**test:**
+| Variante | Config | Digit | Field | Acta | Recon. | MAE |
+|---|---|---|---|---|---|---|
+| base | sin augmentation | 98.07% | 98.84% | 86.58% | 89.55% | 2.44 |
+| ls_ra | label smoothing + RandAugment | 98.24% | 98.95% | 87.71% | 90.68% | 2.44 |
+| ls_ra_mu_cos | + mixup + cosine LR | **98.28%** | **98.99%** | **88.42%** | **91.67%** | **2.07** |
+
+`base` y `ls_ra` salen de `03_ablaciones_colab.ipynb`; la fila `ls_ra_mu_cos`
+es de `02` (la corrida de 03 se corto antes de evaluar esa variante). La brecha
+val→test es modesta (~0.6pp digit, ~2pp acta): generaliza bien, sin overfit.
+Detalle en [`docs/04-modelo-entrenamiento.md`](docs/04-modelo-entrenamiento.md).
 
 Detalle completo del proyecto y del pipeline en
 [`CLAUDE.md`](CLAUDE.md) y en [`docs/`](docs/).
 
 ## Entregable
 
-El entregable son **dos notebooks de Colab** que separan el preprocesamiento
-(lo que mas se itera) del modelo, comunicados por el bundle de crops en HF:
+El entregable son **tres notebooks de Colab** —preprocesamiento, modelo y
+ablacion ink-aware—, comunicados por el bundle de crops en HF:
 
 - **[`notebooks/01_preprocesamiento_colab.ipynb`](notebooks/01_preprocesamiento_colab.ipynb)** —
   preprocesa las 5,000 actas (render → deteccion de digitos → crops → manifests)
@@ -67,10 +83,15 @@ El entregable son **dos notebooks de Colab** que separan el preprocesamiento
   modelo + evaluacion: abrir en Colab, `Runtime → Change runtime type → T4 GPU`,
   `Run all`. Es autonomo (lleva el codigo del modelo inline; no clona el repo) y
   baja los crops preprocesados del HF dataset publico (prerequisito: `01` corrio
-  una vez). Entrena (~5-8 min en T4) y reporta las metricas finales; los
-  resultados de cada corrida quedan en las salidas del notebook.
+  una vez). Entrena (~5-8 min en T4) y reporta las metricas finales (val + test);
+  los resultados de cada corrida quedan en las salidas del notebook.
 
-Ambos se generan desde el paquete con `python tools/build_notebooks.py` (editar
+- **[`notebooks/03_ablaciones_colab.ipynb`](notebooks/03_ablaciones_colab.ipynb)** —
+  ablacion ink-aware: re-entrena las 3 variantes (base, ls_ra, ls_ra_mu_cos)
+  sobre el bundle ink-aware y las compara en val + test en una sola tabla
+  (~20-35 min en T4). `ls_ra_mu_cos` es la misma receta del `02`.
+
+Los tres se generan desde el paquete con `python tools/build_notebooks.py` (editar
 los bloques en `tools/_inline_code.py`, no el `.ipynb`). Se iteran por separado:
 `01` solo lleva el preprocesamiento y `02` solo el modelo; lo unico que los
 acopla son los datos, asi que si cambias la deteccion de digitos hay que re-correr
