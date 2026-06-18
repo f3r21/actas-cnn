@@ -408,26 +408,30 @@ if csv_map:
     print("\\nablations:"); print(ablations_table(csv_map).round(4))
 else:
     print("\\n(ablations: corre scripts/evaluate.py por variante en local para la tabla del informe)")'''),
-        md("## 6. Persistir el modelo oficial (opcional)"),
-        code('''# Guarda el checkpoint en el repositorio (requiere HF_TOKEN con permisos de escritura)
+        md("## 6. Publicar el checkpoint oficial en HF\n\n"
+           "Sube `resnet18_best.pt` (el modelo de la seccion 3, receta "
+           "`ls_ra_mu_cos`) al repo de modelos. Requiere el `HF_TOKEN` con "
+           "permiso de escritura en el panel de secretos de Colab; sin el, el "
+           "checkpoint queda solo en la VM (efimero)."),
+        code('''# Toma el HF_TOKEN del panel de secretos de Colab y publica el checkpoint.
 import os
-from huggingface_hub import HfApi
-
-if os.environ.get("HF_TOKEN") or "HF_TOKEN" in os.environ:
+if not os.environ.get("HF_TOKEN"):
     try:
-        api = HfApi()
-        # Se requiere subir a actas-cnn-model (u otro repo)
-        api.upload_file(
-            path_or_fileobj="resnet18_best.pt",
-            path_in_repo="resnet18_best.pt",
-            repo_id="f3r21/actas-cnn-model",
-            repo_type="model"
-        )
-        print("Modelo oficial subido a f3r21/actas-cnn-model!")
-    except Exception as e:
-        print(f"Error al subir: {e}")
+        from google.colab import userdata
+        os.environ["HF_TOKEN"] = userdata.get("HF_TOKEN")
+    except Exception:  # fuera de Colab o secreto ausente / sin acceso
+        pass
+
+if os.environ.get("HF_TOKEN"):
+    from huggingface_hub import HfApi
+    HfApi(token=os.environ["HF_TOKEN"]).upload_file(
+        path_or_fileobj="resnet18_best.pt", path_in_repo="resnet18_best.pt",
+        repo_id="f3r21/actas-cnn-model", repo_type="model")
+    print("checkpoint oficial subido a f3r21/actas-cnn-model (resnet18_best.pt)")
 else:
-    print("HF_TOKEN no configurado. El archivo resnet18_best.pt se queda en el entorno local (descargalo manualmente si quieres conservarlo).")'''),
+    print("HF_TOKEN no configurado: el checkpoint quedo solo en la VM. Agregalo en "
+          "el panel de secretos de Colab (permiso de escritura, activa el acceso "
+          "para este notebook) y re-corre esta celda para publicarlo.")'''),
         md("---\n**Cierre.** Pipeline completo desde el PDF del acta hasta las metricas de "
            "reconstruccion de votos. Modelo: ResNet-18 estilo CIFAR. El detalle "
            "metodologico y los experimentos (preprocesamiento alternativo, solver) viven "
